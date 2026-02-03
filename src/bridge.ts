@@ -1,6 +1,6 @@
 import * as z from "zod/mini";
 import { getFailureReason } from "./utils";
-import { deleteToken, getToken } from "./storage";
+import { deleteToken, getToken, setToken } from "./storage";
 import type { Config } from "./config";
 
 export function connectToBridge(input: ConnectToBridgeInput): BridgeApi {
@@ -45,6 +45,7 @@ export function connectToBridge(input: ConnectToBridgeInput): BridgeApi {
         switch (message.type) {
           case "client.connected": {
             state = message.payload;
+            setToken(state.token);
             input.onStateChange(state);
             break;
           }
