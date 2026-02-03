@@ -1,30 +1,28 @@
 <!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>hodei-client</title>
+  </head>
 
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>hodei-client</title>
-</head>
+  <body>
+    <button id="connect">connect</button>
+    <script type="module" src="/src/dev.ts"></script>
+  </body>
 
-<body>
-  <button id="connect">connect</button>
-  <script type="module" src="/src/dev.ts"></script>
-</body>
+  <style>
+    @media (prefers-color-scheme: dark) {
+      :root {
+        background-color: #1a1a1a;
+        color: #fff;
+      }
 
-<style>
-  @media (prefers-color-scheme: dark) {
-    :root {
-      background-color: #1a1a1a;
-      color: #fff;
+      button {
+        background-color: #333;
+        color: #fff;
+      }
     }
-
-    button {
-      background-color: #333;
-      color: #fff;
-    }
-  }
-</style>
-
+  </style>
 </html>
