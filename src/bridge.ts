@@ -31,21 +31,29 @@ export function connectToBridge(input: ConnectToBridgeInput): BridgeApi {
       return;
     }
 
-    console.log("[HODEI] scheduling reconnect");
+    const delay = Math.pow(2, reconnectAttempts) * 1000;
 
-    reconnectTimer = setTimeout(
-      () => {
-        console.log("[HODEI] reconnecting");
-        reconnectTimer = undefined;
-        bridge = doConnectToBridge({ config: input.config, onStateChange });
-      },
-      Math.pow(2, reconnectAttempts) * 1000,
-    );
+    console.log("[HODEI] reconnecting in", delay / 1000, "seconds");
+
+    reconnectTimer = setTimeout(() => {
+      console.log("[HODEI] reconnecting");
+      reconnectTimer = undefined;
+      bridge = doConnectToBridge({ config: input.config, onStateChange });
+    }, delay);
   };
 
   bridge = doConnectToBridge({ config: input.config, onStateChange });
 
-  return bridge;
+  return {
+    getState: () => bridge.getState(),
+    disconnect: () => {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = undefined;
+      }
+      bridge.disconnect();
+    },
+  };
 }
 
 function doConnectToBridge(input: ConnectToBridgeInput): BridgeApi {

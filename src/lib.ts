@@ -115,7 +115,7 @@ async function enable(input: EnableInput): Promise<EnableOutput> {
 }
 
 function createEnabledWalletApi(): EnabledWalletApi {
-  throw new Error("Not implemented");
+  throw new Error("TODO Not implemented");
 }
 
 export type MountClientOutput = {
