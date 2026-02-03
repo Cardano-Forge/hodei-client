@@ -8,7 +8,7 @@ export type InitialWalletApi = {
 
 export type EnabledWalletApi = {
   getNetworkId(): Promise<number>;
-  getUtxos(amount?: string, paginate?: number): Promise<string[] | undefined>;
+  getUtxos(amount?: string, paginate?: number): Promise<string[] | null>;
   getBalance(): Promise<string>;
   getUsedAddresses(paginate?: number): Promise<string[]>;
   getUnusedAddresses(): Promise<string[]>;
@@ -17,6 +17,7 @@ export type EnabledWalletApi = {
   signTx(tx: string, partialSign?: boolean): Promise<string>;
   signData(addr: string, payload: string): Promise<string>;
   submitTx(tx: string): Promise<string>;
+  /** Non-standard. Used by the Weld wallet connector to allow wallets to clean up on disconnect. */
   disconnect?(): void | Promise<void>;
 };
 

@@ -1,8 +1,10 @@
 import { connectToBridge, type BridgeApi } from "./bridge";
 import { sendCommand, type Command } from "./command";
-import type { Config } from "./config";
+import { DEFAULT_CONFIG, type Config } from "./config";
 import type { EnabledWalletApi, InitialWalletApi } from "./api";
 import { deferredPromise } from "./utils";
+import { getBalance, submitTx } from "./anvil";
+import { createApiError, createTxSendError } from "./error";
 
 export function initialize(config: Partial<Config>): InitialWalletApi | undefined {
   if (typeof window === "undefined") {
@@ -26,15 +28,12 @@ type State = {
   resolved?: EnableOutput;
 };
 
-const defaultConfig: Config = {
-  serverUrl: "http://localhost:8000",
-  onError: ({ error }) => console.error("[HODEI] unhandled error:", error ?? "unknown"),
-  onClose: ({ code, reason }) => console.error("[HODEI] unhandled closure:", code, reason),
-};
-
 function createInitialWalletApi(initialConfig: Partial<Config> = {}): InitialWalletApi {
   const state: State = {
-    config: { ...defaultConfig, ...initialConfig },
+    config: {
+      ...DEFAULT_CONFIG,
+      ...initialConfig,
+    },
   };
 
   return {
@@ -105,17 +104,78 @@ async function enable(input: EnableInput): Promise<EnableOutput> {
 
   const client = await clientPromise;
 
-  const api = createEnabledWalletApi();
+  const ensurePaired = () => {
+    const bridgeState = bridge.getState();
+    if (bridgeState?.status !== "paired") {
+      throw createApiError("refused", new Error("Wallet is not connected"));
+    }
+    return bridgeState;
+  };
+
+  const api: EnabledWalletApi = {
+    getNetworkId: async () => (ensurePaired().network === "mainnet" ? 1 : 0),
+    getUtxos: async () => {
+      throw new Error("TODO Not implemented");
+    },
+    getBalance: async () => {
+      const bridgeState = ensurePaired();
+      try {
+        const balance = await getBalance({
+          config: input.config,
+          network: bridgeState.network,
+          address: bridgeState.baseAddress,
+        });
+
+        return balance;
+      } catch (error) {
+        throw createApiError("internalError", error);
+      }
+    },
+    getUsedAddresses: async () => {
+      const bridgeState = ensurePaired();
+      return [bridgeState.baseAddress];
+    },
+    getUnusedAddresses: async () => {
+      return [];
+    },
+    getChangeAddress: async () => {
+      const bridgeState = ensurePaired();
+      return bridgeState.baseAddress;
+    },
+    getRewardAddresses: async () => {
+      const bridgeState = ensurePaired();
+      return [bridgeState.stakeAddress];
+    },
+    signTx: async () => {
+      throw new Error("TODO Not implemented");
+    },
+    signData: async () => {
+      throw new Error("TODO Not implemented");
+    },
+    submitTx: async (tx) => {
+      const bridgeState = ensurePaired();
+      try {
+        const txHash = await submitTx({
+          config: input.config,
+          network: bridgeState.network,
+          tx,
+        });
+
+        return txHash;
+      } catch (error) {
+        throw createTxSendError("failure", error);
+      }
+    },
+    disconnect: async () => {
+      bridge.disconnect();
+    },
+  };
 
   return {
     api,
     bridge,
     client,
   };
-}
-
-function createEnabledWalletApi(): EnabledWalletApi {
-  throw new Error("TODO Not implemented");
 }
 
 export type MountClientOutput = {
