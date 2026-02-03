@@ -3,7 +3,52 @@ import { getFailureReason } from "./utils";
 import { deleteToken, getToken, setToken } from "./storage";
 import type { Config } from "./config";
 
+const MAX_RECONNECT_ATTEMPTS = 5;
+
 export function connectToBridge(input: ConnectToBridgeInput): BridgeApi {
+  let reconnectAttempts = 0;
+  let reconnectTimer: number | undefined;
+
+  let bridge: BridgeApi;
+
+  const onStateChange = (state: BridgeState) => {
+    if (reconnectTimer) {
+      console.log("[HODEI] clearing reconnect timer");
+      clearTimeout(reconnectTimer);
+      reconnectTimer = undefined;
+    }
+
+    if (state.status !== "error" && state.status !== "closed") {
+      console.log("[HODEI] forwarding state update");
+      reconnectAttempts = 0;
+      input.onStateChange(state);
+      return;
+    }
+
+    if (++reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+      console.log("[HODEI] max reconnect attempts reached");
+      input.onStateChange(state);
+      return;
+    }
+
+    console.log("[HODEI] scheduling reconnect");
+
+    reconnectTimer = setTimeout(
+      () => {
+        console.log("[HODEI] reconnecting");
+        reconnectTimer = undefined;
+        bridge = doConnectToBridge({ config: input.config, onStateChange });
+      },
+      Math.pow(2, reconnectAttempts) * 1000,
+    );
+  };
+
+  bridge = doConnectToBridge({ config: input.config, onStateChange });
+
+  return bridge;
+}
+
+function doConnectToBridge(input: ConnectToBridgeInput): BridgeApi {
   const url = new URL("/client/ws", input.config.serverUrl.replace("http", "ws"));
 
   const token = getToken();
