@@ -4,7 +4,7 @@ import type { Config } from "./config";
 import type { EnabledWalletApi, InitialWalletApi } from "./api";
 import { deferredPromise } from "./utils";
 
-export function initialize(): InitialWalletApi | undefined {
+export function initialize(config: Partial<Config>): InitialWalletApi | undefined {
   if (typeof window === "undefined") {
     return undefined;
   }
@@ -14,7 +14,7 @@ export function initialize(): InitialWalletApi | undefined {
   }
 
   if (!window.cardano.hodei) {
-    window.cardano.hodei = createInitialWalletApi();
+    window.cardano.hodei = createInitialWalletApi(config);
   }
 
   return window.cardano.hodei;
@@ -28,6 +28,8 @@ type State = {
 
 const defaultConfig: Config = {
   serverUrl: "http://localhost:8000",
+  onError: ({ error }) => console.error("[HODEI] unhandled error:", error ?? "unknown"),
+  onClose: ({ code, reason }) => console.error("[HODEI] unhandled closure:", code, reason),
 };
 
 function createInitialWalletApi(initialConfig: Partial<Config> = {}): InitialWalletApi {
@@ -78,7 +80,24 @@ async function enable(input: EnableInput): Promise<EnableOutput> {
   const bridge = connectToBridge({
     config: input.config,
     onStateChange: (state) => {
-      console.log("state", state);
+      switch (state.status) {
+        case "error": {
+          input.config.onError(state);
+          break;
+        }
+        case "closed": {
+          input.config.onClose(state);
+          break;
+        }
+        case "paired": {
+          console.log("TODO paired", state);
+          break;
+        }
+        case "pairing": {
+          console.log("TODO pairing", state);
+          break;
+        }
+      }
     },
   });
 
