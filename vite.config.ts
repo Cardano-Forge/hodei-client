@@ -8,7 +8,7 @@ export default defineConfig({
     lib: {
       entry: "src/lib.ts",
       name: "hodei-client",
-      fileName: "hodei-client"
-    }
-  }
+      fileName: "hodei-client",
+    },
+  },
 });

@@ -1,3 +1,4 @@
+import { sendCommand } from "./command";
 import type { EnabledWalletApi, InitialWalletApi } from "./types";
 
 export function initialize(): InitialWalletApi | undefined {
@@ -25,7 +26,7 @@ function createInitialWalletApi(): InitialWalletApi {
     apiVersion: "1",
     async enable(): Promise<EnabledWalletApi> {
       if (!customElements.get("hodei-client")) {
-        await import("./hodei-client.svelte");
+        await import("./client.svelte");
       }
 
       let element = document.querySelector("hodei-client") ?? undefined;
@@ -34,10 +35,18 @@ function createInitialWalletApi(): InitialWalletApi {
         document.body.appendChild(element);
       }
 
+      element.addEventListener(
+        "mounted",
+        () => {
+          sendCommand(element, { type: "enable" });
+        },
+        { once: true },
+      );
+
       throw new Error("Not implemented");
     },
     async isEnabled(): Promise<boolean> {
       return isEnabled;
-    }
+    },
   };
 }
