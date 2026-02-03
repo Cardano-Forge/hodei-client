@@ -57,7 +57,9 @@ export function connectToBridge(input: ConnectToBridgeInput): BridgeApi {
 }
 
 function doConnectToBridge(input: ConnectToBridgeInput): BridgeApi {
-  const url = new URL("/client/ws", input.config.bridgeUrl.replace("http", "ws"));
+  // Use check endpoint to validate token before connecting
+
+  const url = new URL("/client/ws", input.config.bridge.baseUrl.replace("http", "ws"));
 
   const token = getToken();
   if (token) {

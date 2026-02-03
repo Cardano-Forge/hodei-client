@@ -6,7 +6,7 @@ import { deferredPromise } from "./utils";
 import { getBalance, submitTx } from "./anvil";
 import { createApiError, createTxSendError } from "./error";
 
-export function initialize(config: Partial<Config>): InitialWalletApi | undefined {
+export function initialize(config?: Partial<Config>): InitialWalletApi | undefined {
   if (typeof window === "undefined") {
     return undefined;
   }
