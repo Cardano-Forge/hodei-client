@@ -3,7 +3,7 @@ import { sendCommand, type Command } from "./command";
 import { DEFAULT_CONFIG, type Config } from "./config";
 import type { EnabledWalletApi, InitialWalletApi } from "./api";
 import { deferredPromise } from "./utils";
-import { getBalance, submitTx } from "./anvil";
+import { getBalance, getUtxos, submitTx } from "./anvil";
 import { createApiError, createTxSendError } from "./error";
 
 export function initialize(config?: Partial<Config>): InitialWalletApi | undefined {
@@ -115,7 +115,18 @@ async function enable(input: EnableInput): Promise<EnableOutput> {
   const api: EnabledWalletApi = {
     getNetworkId: async () => (ensurePaired().network === "mainnet" ? 1 : 0),
     getUtxos: async () => {
-      throw new Error("TODO Not implemented");
+      const bridgeState = ensurePaired();
+      try {
+        const utxos = await getUtxos({
+          config: input.config,
+          network: bridgeState.network,
+          address: bridgeState.baseAddress,
+        });
+
+        return utxos;
+      } catch (error) {
+        throw createApiError("internalError", error);
+      }
     },
     getBalance: async () => {
       const bridgeState = ensurePaired();
@@ -152,16 +163,16 @@ async function enable(input: EnableInput): Promise<EnableOutput> {
     signData: async () => {
       throw new Error("TODO Not implemented");
     },
-    submitTx: async (tx) => {
+    submitTx: async (transaction) => {
       const bridgeState = ensurePaired();
       try {
-        const txHash = await submitTx({
+        const res = await submitTx({
           config: input.config,
           network: bridgeState.network,
-          tx,
+          transaction,
         });
 
-        return txHash;
+        return res.txHash;
       } catch (error) {
         throw createTxSendError("failure", error);
       }
