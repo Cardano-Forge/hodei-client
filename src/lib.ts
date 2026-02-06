@@ -1,4 +1,4 @@
-import { connectToBridge, type BridgeApi } from "./bridge";
+import { type BridgeApi, Bridge } from "./bridge";
 import { sendCommand, type Command } from "./command";
 import { DEFAULT_CONFIG, type Config } from "./config";
 import type { EnabledWalletApi, InitialWalletApi } from "./api";
@@ -76,7 +76,7 @@ export type EnableOutput = {
 async function enable(input: EnableInput): Promise<EnableOutput> {
   const clientPromise = mountClient();
 
-  const bridge = connectToBridge({
+  const bridge = new Bridge({
     config: input.config,
     onStateChange: (state) => {
       switch (state.status) {
@@ -99,6 +99,8 @@ async function enable(input: EnableInput): Promise<EnableOutput> {
       }
     },
   });
+
+  await bridge.connect();
 
   window.addEventListener("beforeunload", () => bridge.disconnect());
 
