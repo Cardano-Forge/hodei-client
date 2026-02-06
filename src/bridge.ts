@@ -199,6 +199,8 @@ export class Bridge {
         { signal: connection.controller.signal },
       );
 
+      this._attempts = 0;
+
       return state;
     } catch (error) {
       ws.close();
@@ -206,9 +208,35 @@ export class Bridge {
     }
   }
 
+  private _attempts = 0;
+  private _reconnectTimer?: number;
   private _scheduleReconnect(): boolean {
-    // TODO
-    return false;
+    if (this._reconnectTimer) {
+      console.log("[HODEI] clearing reconnect timer");
+      clearTimeout(this._reconnectTimer);
+    }
+
+    if (this._attempts >= 5) {
+      console.log("[HODEI] max reconnect attempts reached");
+      return false;
+    }
+
+    const delay = Math.pow(2, ++this._attempts) * 1000;
+    console.log(`[HODEI] reconnecting in ${delay / 1000}s`);
+
+    const timer = setTimeout(() => {
+      if (this._reconnectTimer !== timer) {
+        console.log("[HODEI] reconnect timer cleared. ignoring");
+        return;
+      }
+      console.log("[HODEI] reconnecting");
+      this._reconnectTimer = undefined;
+      this._connect().catch(() => this._scheduleReconnect());
+    }, delay);
+
+    this._reconnectTimer = timer;
+
+    return true;
   }
 
   private async _getToken(): Promise<string | undefined> {
