@@ -7,8 +7,6 @@
   let bridgeState = $state<BridgeState>();
   let dialogEl = $state<HTMLDialogElement>();
 
-  $effect(() => console.log(bridgeState));
-
   $effect(() => {
     if (bridgeState?.status === "pairing") {
       dialogEl?.showModal();
@@ -65,7 +63,14 @@
   });
 </script>
 
-<dialog bind:this={dialogEl}>
+<dialog
+  bind:this={dialogEl}
+  onclick={(event) => {
+    if (event.target === dialogEl) {
+      dialogEl.close();
+    }
+  }}
+>
   {#if bridgeState?.status === "pairing"}
     <article>
       <img src="https://ik.imagekit.io/pizzli/cforge/logo.png" alt="hodei" />
