@@ -1,10 +1,11 @@
-import { type BridgeApi, Bridge, type BridgeOpts, type BridgeState } from "./bridge";
+import { Bridge, type BridgeOpts, type BridgeState, checkToken } from "./bridge";
 import { sendCommand, type Command } from "./command";
 import { DEFAULT_CONFIG, type Config } from "./config";
 import type { EnabledWalletApi, InitialWalletApi } from "./api";
 import { deferredPromise } from "./utils";
 import { getBalance, getUtxos, submitTx } from "./anvil";
 import { createApiError, createTxSendError } from "./error";
+import { getToken } from "./storage";
 
 export function initialize(config?: Partial<Config>): InitialWalletApi | undefined {
   if (typeof window === "undefined") {
@@ -78,27 +79,37 @@ function createInitialWalletApi(initialConfig: Partial<Config> = {}): InitialWal
       }
     },
     async isEnabled(): Promise<boolean> {
-      if (state.resolved) {
-        return true;
-      }
-
       if (state.promise) {
-        return state.promise.then(
-          () => true,
-          () => false,
-        );
+        try {
+          await state.promise;
+          return true;
+        } catch {
+          return false;
+        }
       }
 
-      // TODO Create a check endpoint on the server
+      if (state.resolved) {
+        return state.resolved.bridge.isConnected();
+      }
 
-      throw new Error("Not implemented");
+      const token = getToken();
+      if (!token) {
+        return false;
+      }
+
+      try {
+        const checked = await checkToken({ config: state.config, token });
+        return checked.valid;
+      } catch {
+        return false;
+      }
     },
   };
 }
 
 export type EnableOutput = {
   api: EnabledWalletApi;
-  bridge: BridgeApi;
+  bridge: Bridge;
   client: MountClientOutput;
 };
 

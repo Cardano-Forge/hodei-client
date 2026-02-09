@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
     "lint": "prettier --check . && eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "pre": "npm run format && npm run lint && npm run check && npm run build"
   },
   "devDependencies": {
     "@eslint/compat": "^2.0.1",

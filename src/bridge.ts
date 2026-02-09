@@ -3,13 +3,18 @@ import { deferredPromise, getFailureReason } from "./utils";
 import { deleteToken, getToken, setToken } from "./storage";
 import type { Config } from "./config";
 
+export type BridgeState =
+  | ConnectionState
+  | { status: "closed"; reason: string; code: number }
+  | { status: "error"; error?: string };
+
 export type BridgeOpts = {
   config: Config;
   onStateChange(state: BridgeState): void;
   debug?: boolean;
 };
 
-type Connection = {
+export type BridgeConnection = {
   id: number;
   ws: WebSocket;
   state: BridgeState;
@@ -22,7 +27,7 @@ export class Bridge {
   private _debug: boolean;
 
   private _connectPromise: Promise<ConnectionState> | undefined;
-  private _connection?: Connection;
+  private _connection?: BridgeConnection;
 
   constructor(opts: BridgeOpts) {
     this._config = opts.config;
@@ -40,11 +45,21 @@ export class Bridge {
     }
 
     let header = "[HODEI]";
-    if (this._connection) {
-      header += ` (${this._connection.id})`;
+    if (this.connection) {
+      header += ` (${this.connection.id})`;
     }
 
     console.log(header, ...args);
+  }
+
+  get connection(): BridgeConnection | undefined {
+    return this._connection;
+  }
+
+  isConnected(): this is { connection: { state: ConnectionState } } {
+    return (
+      this.connection?.state.status === "paired" || this.connection?.state.status === "pairing"
+    );
   }
 
   async connect(): Promise<ConnectionState> {
@@ -52,11 +67,8 @@ export class Bridge {
       return this._connectPromise;
     }
 
-    if (
-      this._connection?.state.status === "pairing" ||
-      this._connection?.state.status === "paired"
-    ) {
-      return this._connection.state;
+    if (this.isConnected()) {
+      return this.connection.state;
     }
 
     this._connectPromise = this._connect();
@@ -75,7 +87,7 @@ export class Bridge {
   }
 
   getState(): BridgeState | undefined {
-    return this._connection?.state;
+    return this.connection?.state;
   }
 
   private async _connect(): Promise<ConnectionState> {
@@ -89,7 +101,7 @@ export class Bridge {
       url.searchParams.set("token", token);
     }
 
-    const connectionId = (this._connection?.id ?? 0) + 1;
+    const connectionId = (this.connection?.id ?? 0) + 1;
     const ws = new WebSocket(url);
     const connectionController = new AbortController();
     const deferred = deferredPromise<ConnectionState>();
@@ -130,7 +142,7 @@ export class Bridge {
 
       setToken(state.token);
 
-      const connection: Connection = {
+      const connection: BridgeConnection = {
         id: connectionId,
         ws,
         state: state as BridgeState,
@@ -316,16 +328,6 @@ export async function checkToken(input: CheckTokenInput): Promise<CheckedToken> 
 
   return { valid: true, token: input.token };
 }
-
-export type BridgeState =
-  | ConnectionState
-  | { status: "closed"; reason: string; code: number }
-  | { status: "error"; error?: string };
-
-export type BridgeApi = {
-  getState(): BridgeState | undefined;
-  disconnect(): void;
-};
 
 const connectionStateSchema = z.discriminatedUnion("status", [
   z.object({
