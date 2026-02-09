@@ -10,3 +10,16 @@ document.querySelector("#check")?.addEventListener("click", async () => {
   const res = await window.cardano?.hodei?.isEnabled();
   console.log("isEnabled?", res);
 });
+
+document.querySelector("#toggle")?.addEventListener("click", async () => {
+  const existing = document.querySelector("dialog");
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  const el = document.createElement("dialog");
+  el.innerText = "my dialog with long text inside it";
+  el.open = true;
+  document.body.appendChild(el);
+});

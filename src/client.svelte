@@ -27,22 +27,50 @@
     $host().dispatchEvent(new CustomEvent("mounted"));
     return () => $host().dispatchEvent(new CustomEvent("unmounted"));
   });
+
+  $effect(() => {
+    const parent = $host().parentElement;
+    if (!parent) {
+      return;
+    }
+
+    // Ensures that the host element is always the last child of its parent
+    // to avoid z-index issues
+    const observer = new MutationObserver(() => {
+      if (parent.lastElementChild !== $host()) {
+        parent.removeChild($host());
+        parent.appendChild($host());
+      }
+    });
+
+    observer.observe(parent, { childList: true });
+    return () => observer.disconnect();
+  });
 </script>
+
+{#if bridgeState?.status === "pairing"}
+  <dialog open>PIN: {bridgeState.pin}</dialog>
+{/if}
 
 {#if bridgeState}
   <div class="status">
     status: {bridgeState.status}
-    {#if bridgeState.status === "pairing"}
-      <div>PIN: {bridgeState.pin}</div>
-    {/if}
   </div>
 {/if}
 
 <style>
   .status {
     position: fixed;
-    top: 0;
+    bottom: 0;
     right: 0;
     padding: 1rem;
+  }
+
+  dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: orange;
+    z-index: 9999;
   }
 </style>
