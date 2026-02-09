@@ -1,6 +1,9 @@
 import { initialize } from "./lib";
 
-initialize();
+initialize({
+  onError: ({ error }) => console.log("socket error:", error ?? "unknown"),
+  onClose: ({ code, reason }) => console.log("socket closed:", code, reason),
+});
 
 document.querySelector("#connect")?.addEventListener("click", async () => {
   window.cardano?.hodei?.enable();
