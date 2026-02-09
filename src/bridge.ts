@@ -76,8 +76,7 @@ export class Bridge {
   }
 
   disconnect(): void {
-    this._connection?.controller.abort();
-    this._connection?.ws.close();
+    this._connection?.ws.close(1000, "disconnected");
     this._connection = undefined;
   }
 
@@ -199,6 +198,8 @@ export class Bridge {
           };
 
           this._onStateChange(connection.state);
+
+          connection.controller.abort();
         },
         { signal: connection.controller.signal },
       );
@@ -226,6 +227,8 @@ export class Bridge {
           };
 
           this._onStateChange(connection.state);
+
+          connection.controller.abort();
         },
         { signal: connection.controller.signal },
       );
@@ -234,7 +237,7 @@ export class Bridge {
 
       return state;
     } catch (error) {
-      ws.close();
+      ws.close(undefined, `failed to connect: ${getFailureReason(error)}`);
       throw error;
     }
   }

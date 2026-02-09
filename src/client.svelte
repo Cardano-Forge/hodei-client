@@ -2,18 +2,33 @@
 
 <script lang="ts">
   import type { BridgeState } from "./bridge";
-  import { addCommandListener, type Command } from "./command";
+  import { addCommandListener, sendCommand, type Command } from "./command";
 
   let bridgeState = $state<BridgeState>();
+  let dialogEl = $state<HTMLDialogElement>();
+
+  $effect(() => {
+    if (bridgeState?.status === "pairing") {
+      dialogEl?.showModal();
+    } else if (dialogEl?.open) {
+      dialogEl.close();
+    }
+  });
+
+  function handleDialogClose() {
+    sendCommand($host(), { type: "dialog_closed" });
+  }
+
+  $effect(() => {
+    dialogEl?.addEventListener("close", handleDialogClose);
+    return () => dialogEl?.removeEventListener("close", handleDialogClose);
+  });
 
   function handleCommand(command: Command) {
     switch (command.type) {
       case "state_changed": {
         bridgeState = command.payload;
         break;
-      }
-      default: {
-        console.error("unknown command", command);
       }
     }
   }
@@ -48,9 +63,14 @@
   });
 </script>
 
-{#if bridgeState?.status === "pairing"}
-  <dialog open>PIN: {bridgeState.pin}</dialog>
-{/if}
+<dialog bind:this={dialogEl}>
+  <article>
+    <header>PIN</header>
+    {#if bridgeState?.status === "pairing"}
+      {bridgeState.pin}
+    {/if}
+  </article>
+</dialog>
 
 {#if bridgeState}
   <div class="status">
@@ -67,10 +87,11 @@
   }
 
   dialog {
-    position: fixed;
-    top: 0;
-    left: 0;
-    background-color: orange;
-    z-index: 9999;
+    background: white;
+    padding: 1rem;
+  }
+
+  dialog::backdrop {
+    background: rgba(0, 0, 0, 0.4);
   }
 </style>

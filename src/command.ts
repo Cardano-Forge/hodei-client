@@ -8,6 +8,7 @@ export function sendCommand(element: Element, command: Command) {
 export function addCommandListener(
   element: Element,
   onCommand: (command: Command) => void,
+  opts?: AddEventListenerOptions,
 ): () => void {
   const handler = (event: Event) => {
     const command = parseCommandEvent(event);
@@ -16,10 +17,10 @@ export function addCommandListener(
     }
   };
 
-  element.addEventListener("command", handler);
+  element.addEventListener("command", handler, opts);
 
   return () => {
-    element.removeEventListener("command", handler);
+    element.removeEventListener("command", handler, opts);
   };
 }
 
@@ -41,6 +42,13 @@ const stateChangedCommandSchema = z.object({
   payload: bridgeStateSchema,
 });
 
-const commandSchema = z.discriminatedUnion("type", [stateChangedCommandSchema]);
+const dialogClosedCommandSchema = z.object({
+  type: z.literal("dialog_closed"),
+});
+
+const commandSchema = z.discriminatedUnion("type", [
+  stateChangedCommandSchema,
+  dialogClosedCommandSchema,
+]);
 
 export type Command = z.infer<typeof commandSchema>;
