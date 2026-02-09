@@ -7,6 +7,8 @@
   let bridgeState = $state<BridgeState>();
   let dialogEl = $state<HTMLDialogElement>();
 
+  $effect(() => console.log(bridgeState));
+
   $effect(() => {
     if (bridgeState?.status === "pairing") {
       dialogEl?.showModal();
@@ -64,12 +66,14 @@
 </script>
 
 <dialog bind:this={dialogEl}>
-  <article>
-    <header>PIN</header>
-    {#if bridgeState?.status === "pairing"}
-      {bridgeState.pin}
-    {/if}
-  </article>
+  {#if bridgeState?.status === "pairing"}
+    <article>
+      <img src="https://ik.imagekit.io/pizzli/cforge/logo.png" alt="hodei" />
+      <h1>Pairing</h1>
+      <h2>{bridgeState.pin}</h2>
+      <p>Enter this code on the Hodei app to pair your wallet</p>
+    </article>
+  {/if}
 </dialog>
 
 {#if bridgeState}
@@ -79,19 +83,75 @@
 {/if}
 
 <style>
+  * {
+    box-sizing: border-box;
+  }
+
+  :host {
+    font-family: "Roboto", Arial, Helvetica, sans-serif;
+  }
+
   .status {
     position: fixed;
     bottom: 0;
     right: 0;
-    padding: 1rem;
+    padding: 24px;
   }
 
   dialog {
-    background: white;
-    padding: 1rem;
+    width: 100%;
+    max-width: 300px;
+    outline: none;
+    border: none;
+    padding: 24px;
+    background: transparent;
   }
 
   dialog::backdrop {
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(0, 0, 0, 0.32);
+  }
+
+  article {
+    padding: 24px;
+    border-radius: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    overflow: hidden;
+    text-align: center;
+    background: linear-gradient(to bottom right, #ebdee8, #fff7fa);
+    color: #1e191e;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    article {
+      background: linear-gradient(to bottom right, #362a36, #181215);
+      color: #eadfe6;
+    }
+  }
+
+  h1 {
+    margin: 12px 0 16px 0;
+    font-size: 20px;
+    font-weight: 400;
+  }
+
+  p {
+    margin: 24px 0 0 0;
+    font-size: 14px;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+  }
+
+  img {
+    width: 75;
+    height: 75px;
   }
 </style>
