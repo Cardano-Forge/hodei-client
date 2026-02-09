@@ -6,6 +6,7 @@ import type { Config } from "./config";
 export type BridgeOpts = {
   config: Config;
   onStateChange(state: BridgeState): void;
+  debug?: boolean;
 };
 
 type Connection = {
@@ -18,6 +19,7 @@ type Connection = {
 export class Bridge {
   private readonly _config: Config;
   private readonly _onStateChange: (state: BridgeState) => void;
+  private _debug: boolean;
 
   private _connectPromise: Promise<ConnectionState> | undefined;
   private _connection?: Connection;
@@ -25,21 +27,45 @@ export class Bridge {
   constructor(opts: BridgeOpts) {
     this._config = opts.config;
     this._onStateChange = opts.onStateChange;
+    this._debug = opts.debug ?? false;
+  }
+
+  setDebug(debug: boolean) {
+    this._debug = debug;
+  }
+
+  private _debugLog(...args: unknown[]) {
+    if (!this._debug) {
+      return;
+    }
+
+    let header = "[HODEI]";
+    if (this._connection) {
+      header += ` (${this._connection.id})`;
+    }
+
+    console.log(header, ...args);
   }
 
   async connect(): Promise<ConnectionState> {
-    if (this._connection) {
-      throw new Error("Already connected");
+    if (this._connectPromise) {
+      return this._connectPromise;
     }
 
-    if (!this._connectPromise) {
-      this._connectPromise = this._connect().then((res) => {
-        this._connectPromise = undefined;
-        return res;
-      });
+    if (
+      this._connection?.state.status === "pairing" ||
+      this._connection?.state.status === "paired"
+    ) {
+      return this._connection.state;
     }
 
-    return this._connectPromise;
+    this._connectPromise = this._connect();
+
+    try {
+      return await this._connectPromise;
+    } finally {
+      this._connectPromise = undefined;
+    }
   }
 
   disconnect(): void {
@@ -68,7 +94,7 @@ export class Bridge {
     const connectionController = new AbortController();
     const deferred = deferredPromise<ConnectionState>();
 
-    console.log(`[HODEI] (${connectionId}) connecting`);
+    this._debugLog("connecting");
 
     ws.addEventListener(
       "message",
@@ -76,7 +102,7 @@ export class Bridge {
         try {
           const json = JSON.parse(event.data);
           const message = connectedMessageSchema.parse(json);
-          console.log(`[HODEI] (${connectionId}) received connection message`);
+          this._debugLog("received connection message");
           deferred.resolve(message.payload);
         } catch (error) {
           deferred.reject(`Error parsing connection message: ${getFailureReason(error)}`);
@@ -90,7 +116,7 @@ export class Bridge {
     ws.addEventListener(
       "error",
       (event) => {
-        console.log(`[HODEI] (${connectionId}) received connection error`);
+        this._debugLog("received connection error");
         deferred.reject(`Error connecting: ${getFailureReason(event)}`);
         connectionController.abort();
       },
@@ -100,7 +126,7 @@ export class Bridge {
     try {
       const state = await deferred.promise;
 
-      console.log(`[HODEI] (${connectionId}) connected`);
+      this._debugLog("connected");
 
       setToken(state.token);
 
@@ -131,7 +157,7 @@ export class Bridge {
             const message = messageSchema.parse(json);
             switch (message.type) {
               case "client.wallet_updated": {
-                console.log(`[HODEI] (${connection.id}) received wallet_updated message`);
+                this._debugLog("received wallet_updated message");
 
                 connection.state = {
                   status: "paired",
@@ -144,9 +170,7 @@ export class Bridge {
               }
             }
           } catch (error) {
-            console.log(
-              `[HODEI] (${connection.id}) error parsing message: ${getFailureReason(error)}`,
-            );
+            this._debugLog(`error parsing message: ${getFailureReason(error)}`);
           }
         },
         { signal: connection.controller.signal },
@@ -156,11 +180,11 @@ export class Bridge {
         "error",
         (event) => {
           if (this._scheduleReconnect()) {
-            console.log(`[HODEI] (${connection.id}) scheduled reconnect after error`);
+            this._debugLog("scheduled reconnect after error");
             return;
           }
 
-          console.log(`[HODEI] (${connection.id}) received error: ${getFailureReason(event)}`);
+          this._debugLog(`received error: ${getFailureReason(event)}`);
 
           connection.state = {
             status: "error",
@@ -177,16 +201,16 @@ export class Bridge {
         async (event) => {
           // Session deleted
           if (event.code === 4001) {
-            console.log(`[HODEI] (${connection.id}) session deleted`);
+            this._debugLog("session deleted");
             deleteToken();
           }
 
           if (event.code !== 1000 && this._scheduleReconnect()) {
-            console.log(`[HODEI] (${connection.id}) scheduled reconnect after close`);
+            this._debugLog("scheduled reconnect after close");
             return;
           }
 
-          console.log(`[HODEI] (${connection.id}) received close: ${event.code} ${event.reason}`);
+          this._debugLog(`received close: ${event.code} ${event.reason}`);
 
           connection.state = {
             status: "closed",
@@ -212,24 +236,24 @@ export class Bridge {
   private _reconnectTimer?: number;
   private _scheduleReconnect(): boolean {
     if (this._reconnectTimer) {
-      console.log("[HODEI] clearing reconnect timer");
+      this._debugLog("clearing reconnect timer");
       clearTimeout(this._reconnectTimer);
     }
 
     if (this._attempts >= 5) {
-      console.log("[HODEI] max reconnect attempts reached");
+      this._debugLog("max reconnect attempts reached");
       return false;
     }
 
     const delay = Math.pow(2, ++this._attempts) * 1000;
-    console.log(`[HODEI] reconnecting in ${delay / 1000}s`);
+    this._debugLog(`reconnecting in ${delay / 1000}s`);
 
     const timer = setTimeout(() => {
       if (this._reconnectTimer !== timer) {
-        console.log("[HODEI] reconnect timer cleared. ignoring");
+        this._debugLog("reconnect timer cleared. ignoring");
         return;
       }
-      console.log("[HODEI] reconnecting");
+      this._debugLog("reconnecting");
       this._reconnectTimer = undefined;
       this._connect().catch(() => this._scheduleReconnect());
     }, delay);
@@ -247,7 +271,7 @@ export class Bridge {
 
     const checked = await checkToken({ config: this._config, token });
 
-    console.log(`[HODEI] checked token: ${checked.valid ? "valid" : `invalid: ${checked.reason}`}`);
+    this._debugLog(`checked token: ${checked.valid ? "valid" : `invalid: ${checked.reason}`}`);
 
     if (checked.valid) {
       return token;
@@ -293,7 +317,7 @@ export async function checkToken(input: CheckTokenInput): Promise<CheckedToken> 
   return { valid: true, token: input.token };
 }
 
-type BridgeState =
+export type BridgeState =
   | ConnectionState
   | { status: "closed"; reason: string; code: number }
   | { status: "error"; error?: string };
