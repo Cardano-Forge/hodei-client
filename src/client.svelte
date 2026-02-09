@@ -1,16 +1,21 @@
 <svelte:options customElement="hodei-client" />
 
 <script lang="ts">
+  import type { BridgeState } from "./bridge";
   import { addCommandListener, type Command } from "./command";
 
-  let count = $state(0);
-
-  function increment() {
-    count++;
-  }
+  let bridgeState = $state<BridgeState>();
 
   function handleCommand(command: Command) {
-    console.log("command", command);
+    switch (command.type) {
+      case "state_changed": {
+        bridgeState = command.payload;
+        break;
+      }
+      default: {
+        console.error("unknown command", command);
+      }
+    }
   }
 
   $effect(() => {
@@ -24,4 +29,20 @@
   });
 </script>
 
-<button onclick={increment}>count is {count}</button>
+{#if bridgeState}
+  <div class="status">
+    status: {bridgeState.status}
+    {#if bridgeState.status === "pairing"}
+      <div>PIN: {bridgeState.pin}</div>
+    {/if}
+  </div>
+{/if}
+
+<style>
+  .status {
+    position: fixed;
+    top: 0;
+    right: 0;
+    padding: 1rem;
+  }
+</style>

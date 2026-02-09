@@ -1,4 +1,5 @@
 import * as z from "zod/mini";
+import { bridgeStateSchema } from "./bridge";
 
 export function sendCommand(element: Element, command: Command) {
   element.dispatchEvent(new CustomEvent("command", { detail: command }));
@@ -35,10 +36,11 @@ export function parseCommandEvent(event: Event): Command | undefined {
   return parsed.data;
 }
 
-const simpleCommandSchema = z.object({
-  type: z.enum(["enable"]),
+const stateChangedCommandSchema = z.object({
+  type: z.enum(["state_changed"]),
+  payload: bridgeStateSchema,
 });
 
-const commandSchema = z.discriminatedUnion("type", [simpleCommandSchema]);
+const commandSchema = z.discriminatedUnion("type", [stateChangedCommandSchema]);
 
 export type Command = z.infer<typeof commandSchema>;

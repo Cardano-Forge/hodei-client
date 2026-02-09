@@ -37,18 +37,26 @@ function createInitialWalletApi(initialConfig: Partial<Config> = {}): InitialWal
     },
   };
 
-  const handleStateChange = (bridgeState: BridgeState) => {
+  const handleStateChange = async (bridgeState: BridgeState) => {
+    // Ensures that state has been updated before we send cmds to client
+    await state.promise?.catch(() => undefined);
+
     if (bridgeState.status === "error") {
       state.config.onError(bridgeState);
-      state.resolved = undefined;
     }
 
     if (bridgeState.status === "closed") {
       state.config.onClose(bridgeState);
-      state.resolved = undefined;
     }
 
-    console.log("TODO handleStateChange", bridgeState);
+    if (state.resolved) {
+      state.resolved?.client.sendCommand({
+        type: "state_changed",
+        payload: bridgeState,
+      });
+    } else {
+      console.error("[HODEI] (state_changed)", bridgeState);
+    }
   };
 
   return {
@@ -114,7 +122,7 @@ export type EnableOutput = {
 };
 
 async function enable(input: BridgeOpts): Promise<EnableOutput> {
-  const clientPromise = mountClient();
+  const client = await mountClient();
 
   const bridge = new Bridge(input);
 
@@ -122,9 +130,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
 
   window.addEventListener("beforeunload", () => bridge.disconnect());
 
-  const client = await clientPromise;
-
-  const ensurePaired = () => {
+  const ensurePaired = (): Extract<BridgeState, { status: "paired" }> => {
     const bridgeState = bridge.getState();
     if (bridgeState?.status !== "paired") {
       throw createApiError("refused", new Error("Wallet is not connected"));

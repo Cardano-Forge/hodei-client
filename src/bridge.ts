@@ -3,11 +3,6 @@ import { deferredPromise, getFailureReason } from "./utils";
 import { deleteToken, getToken, setToken } from "./storage";
 import type { Config } from "./config";
 
-export type BridgeState =
-  | ConnectionState
-  | { status: "closed"; reason: string; code: number }
-  | { status: "error"; error?: string };
-
 export type BridgeOpts = {
   config: Config;
   onStateChange(state: BridgeState): void;
@@ -346,6 +341,13 @@ const connectionStateSchema = z.discriminatedUnion("status", [
   }),
 ]);
 type ConnectionState = z.infer<typeof connectionStateSchema>;
+
+export const bridgeStateSchema = z.discriminatedUnion("status", [
+  connectionStateSchema,
+  z.object({ status: z.literal("closed"), reason: z.string(), code: z.number() }),
+  z.object({ status: z.literal("error"), error: z.optional(z.string()) }),
+]);
+export type BridgeState = z.infer<typeof bridgeStateSchema>;
 
 const connectedMessageSchema = z.object({
   type: z.literal("client.connected"),
