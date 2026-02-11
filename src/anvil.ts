@@ -12,11 +12,11 @@ export type GetUtxosOutput = z.infer<typeof getUtxosOutputSchema>;
 
 export async function getUtxos(input: GetUtxosInput): Promise<GetUtxosOutput> {
   const { baseUrl, apiKey } = input.config.anvil[input.network];
-  const url = new URL("/wallets/utxos", baseUrl);
+  const url = new URL(`${baseUrl}/wallets/utxos`);
   url.searchParams.set("address", input.address);
   url.searchParams.set("includeMempool", "true");
   const res = await fetch(url, { headers: { "x-api-key": apiKey } });
-  const json: unknown = res.json();
+  const json: unknown = await res.json();
   return getUtxosOutputSchema.parse(json);
 }
 
@@ -30,7 +30,7 @@ export type GetBalanceOutput = string;
 
 export async function getBalance(input: GetBalanceInput): Promise<GetBalanceOutput> {
   const { baseUrl, apiKey } = input.config.anvil[input.network];
-  const url = new URL("/wallets/balance", baseUrl);
+  const url = new URL(`${baseUrl}/wallets/balance`);
   url.searchParams.set("address", input.address);
   const res = await fetch(url, { headers: { "x-api-key": apiKey } });
   return res.text();
@@ -49,9 +49,9 @@ type SubmitTxOutput = z.infer<typeof submitTxOutputSchema>;
 
 export async function submitTx(input: SubmitTxInput): Promise<SubmitTxOutput> {
   const { baseUrl, apiKey } = input.config.anvil[input.network];
-  const url = new URL("/wallets/balance", baseUrl);
+  const url = new URL(`${baseUrl}/transactions/submit`);
   url.searchParams.set("transaction", input.transaction);
-  const res = await fetch(url, { headers: { "x-api-key": apiKey } });
-  const json: unknown = res.json();
+  const res = await fetch(url, { method: "POST", headers: { "x-api-key": apiKey } });
+  const json: unknown = await res.json();
   return submitTxOutputSchema.parse(json);
 }

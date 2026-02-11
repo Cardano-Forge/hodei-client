@@ -88,7 +88,7 @@ export class Bridge {
     this.disconnect();
 
     const baseUrl = this._config.bridge.baseUrl.replace("http", "ws");
-    const url = new URL("/client/ws", baseUrl);
+    const url = new URL(`${baseUrl}/client/ws`);
 
     const token = await this._getToken();
     if (token) {
@@ -313,7 +313,7 @@ export type CheckTokenInput = {
 };
 
 export async function checkToken(input: CheckTokenInput): Promise<CheckedToken> {
-  const url = new URL("/client/check", input.config.bridge.baseUrl);
+  const url = new URL(`${input.config.bridge.baseUrl}/client/check`);
 
   const res = await fetch(url, {
     method: "POST",

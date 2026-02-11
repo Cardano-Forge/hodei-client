@@ -12,6 +12,8 @@ let wallet: EnabledWalletApi | undefined;
 
 document.querySelector("#connect")?.addEventListener("click", async () => {
   wallet = await window.cardano?.hodei?.enable();
+  wallet?.getUtxos().then((utxos) => console.log("utxos", utxos));
+  wallet?.getBalance().then((balance) => console.log("balance", balance));
 });
 
 document.querySelector("#check")?.addEventListener("click", async () => {
