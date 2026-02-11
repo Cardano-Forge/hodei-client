@@ -1,8 +1,14 @@
-import { Bridge, type BridgeOpts, type BridgeState, checkToken } from "./bridge";
+import {
+  Bridge,
+  type BridgeOpts,
+  type BridgeState,
+  checkToken,
+  txSigReceivedMessageSchema,
+} from "./bridge";
 import { addCommandListener, sendCommand, type Command } from "./command";
 import { DEFAULT_CONFIG, type Config } from "./config";
 import type { EnabledWalletApi, InitialWalletApi } from "./api";
-import { deferredPromise } from "./utils";
+import { deferredPromise, getFailureReason } from "./utils";
 import { getBalance, getUtxos, submitTx } from "./anvil";
 import { createApiError, createTxSendError } from "./error";
 import { getToken } from "./storage";
@@ -191,8 +197,50 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       const bridgeState = ensurePaired();
       return [bridgeState.stakeAddress];
     },
-    signTx: async () => {
-      throw new Error("TODO Not implemented");
+    signTx: async (tx, partialSign = false) => {
+      ensurePaired();
+
+      if (!bridge.isConnected()) {
+        throw createApiError("refused", new Error("Wallet is not connected"));
+      }
+
+      const controller = new AbortController();
+      bridge.connection.controller.signal.addEventListener("abort", () => controller.abort(), {
+        signal: controller.signal,
+      });
+
+      const deferred = deferredPromise<string>();
+
+      bridge.connection.ws.addEventListener(
+        "message",
+        (event) => {
+          try {
+            const json = JSON.parse(event.data);
+            const message = txSigReceivedMessageSchema.parse(json);
+            if (message.payload.tx !== tx) {
+              return;
+            }
+
+            if (message.type === "client.tx_sig_accepted") {
+              deferred.resolve(message.payload.signature);
+            } else {
+              deferred.reject("Rejected by user");
+            }
+
+            controller.abort();
+          } catch (error) {
+            bridge.debugLog(`error parsing message: ${getFailureReason(error)}`);
+          }
+        },
+        { signal: controller.signal },
+      );
+
+      bridge.send({
+        type: "client.tx_sig_requested",
+        payload: { tx, partialSign },
+      });
+
+      return deferred.promise;
     },
     signData: async () => {
       throw new Error("TODO Not implemented");

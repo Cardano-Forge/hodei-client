@@ -34,7 +34,7 @@ export class Bridge {
     this._debug = debug;
   }
 
-  private _debugLog(...args: unknown[]) {
+  debugLog(...args: unknown[]) {
     if (!this._debug) {
       return;
     }
@@ -100,7 +100,7 @@ export class Bridge {
     const connectionController = new AbortController();
     const deferred = deferredPromise<ConnectionState>();
 
-    this._debugLog("connecting");
+    this.debugLog("connecting");
 
     ws.addEventListener(
       "message",
@@ -108,7 +108,7 @@ export class Bridge {
         try {
           const json = JSON.parse(event.data);
           const message = connectedMessageSchema.parse(json);
-          this._debugLog("received connection message");
+          this.debugLog("received connection message");
           deferred.resolve(message.payload);
         } catch (error) {
           deferred.reject(`Error parsing connection message: ${getFailureReason(error)}`);
@@ -122,7 +122,7 @@ export class Bridge {
     ws.addEventListener(
       "error",
       (event) => {
-        this._debugLog("received connection error");
+        this.debugLog("received connection error");
         deferred.reject(`Error connecting: ${getFailureReason(event)}`);
         connectionController.abort();
       },
@@ -132,7 +132,7 @@ export class Bridge {
     try {
       const state = await deferred.promise;
 
-      this._debugLog("connected");
+      this.debugLog("connected");
 
       setToken(state.token);
 
@@ -160,10 +160,10 @@ export class Bridge {
             }
 
             const json = JSON.parse(event.data);
-            const message = messageSchema.parse(json);
+            const message = incomingMessageSchema.parse(json);
             switch (message.type) {
               case "client.wallet_updated": {
-                this._debugLog("received wallet_updated message");
+                this.debugLog("received wallet_updated message");
 
                 connection.state = {
                   status: "paired",
@@ -176,7 +176,7 @@ export class Bridge {
               }
             }
           } catch (error) {
-            this._debugLog(`error parsing message: ${getFailureReason(error)}`);
+            this.debugLog(`error parsing message: ${getFailureReason(error)}`);
           }
         },
         { signal: connection.controller.signal },
@@ -186,11 +186,11 @@ export class Bridge {
         "error",
         (event) => {
           if (this._scheduleReconnect()) {
-            this._debugLog("scheduled reconnect after error");
+            this.debugLog("scheduled reconnect after error");
             return;
           }
 
-          this._debugLog(`received error: ${getFailureReason(event)}`);
+          this.debugLog(`received error: ${getFailureReason(event)}`);
 
           connection.state = {
             status: "error",
@@ -209,16 +209,16 @@ export class Bridge {
         async (event) => {
           // Session deleted
           if (event.code === 4001) {
-            this._debugLog("session deleted");
+            this.debugLog("session deleted");
             deleteToken();
           }
 
           if (event.code !== 1000 && this._scheduleReconnect()) {
-            this._debugLog("scheduled reconnect after close");
+            this.debugLog("scheduled reconnect after close");
             return;
           }
 
-          this._debugLog(`received close: ${event.code} ${event.reason}`);
+          this.debugLog(`received close: ${event.code} ${event.reason}`);
 
           connection.state = {
             status: "closed",
@@ -242,28 +242,32 @@ export class Bridge {
     }
   }
 
+  send(message: OutgoingMessage) {
+    this.connection?.ws.send(JSON.stringify(message));
+  }
+
   private _attempts = 0;
   private _reconnectTimer?: number;
   private _scheduleReconnect(): boolean {
     if (this._reconnectTimer) {
-      this._debugLog("clearing reconnect timer");
+      this.debugLog("clearing reconnect timer");
       clearTimeout(this._reconnectTimer);
     }
 
     if (this._attempts >= 5) {
-      this._debugLog("max reconnect attempts reached");
+      this.debugLog("max reconnect attempts reached");
       return false;
     }
 
     const delay = Math.pow(2, ++this._attempts) * 1000;
-    this._debugLog(`reconnecting in ${delay / 1000}s`);
+    this.debugLog(`reconnecting in ${delay / 1000}s`);
 
     const timer = setTimeout(() => {
       if (this._reconnectTimer !== timer) {
-        this._debugLog("reconnect timer cleared. ignoring");
+        this.debugLog("reconnect timer cleared. ignoring");
         return;
       }
-      this._debugLog("reconnecting");
+      this.debugLog("reconnecting");
       this._reconnectTimer = undefined;
       this._connect().catch(() => this._scheduleReconnect());
     }, delay);
@@ -281,7 +285,7 @@ export class Bridge {
 
     const checked = await checkToken({ config: this._config, token });
 
-    this._debugLog(`checked token: ${checked.valid ? "valid" : `invalid: ${checked.reason}`}`);
+    this.debugLog(`checked token: ${checked.valid ? "valid" : `invalid: ${checked.reason}`}`);
 
     if (checked.valid) {
       return token;
@@ -366,4 +370,38 @@ const walletUpdatedMessageSchema = z.object({
   }),
 });
 
-const messageSchema = z.discriminatedUnion("type", [walletUpdatedMessageSchema]);
+const txSigAcceptedMessageSchema = z.object({
+  type: z.literal("client.tx_sig_accepted"),
+  payload: z.object({
+    tx: z.string(),
+    signature: z.string(),
+  }),
+});
+
+const txSigRejectedMessageSchema = z.object({
+  type: z.literal("client.tx_sig_rejected"),
+  payload: z.object({
+    tx: z.string(),
+  }),
+});
+
+export const txSigReceivedMessageSchema = z.discriminatedUnion("type", [
+  txSigAcceptedMessageSchema,
+  txSigRejectedMessageSchema,
+]);
+
+const incomingMessageSchema = z.discriminatedUnion("type", [
+  walletUpdatedMessageSchema,
+  txSigReceivedMessageSchema,
+]);
+
+const txSigRequestedMessageSchema = z.object({
+  type: z.literal("client.tx_sig_requested"),
+  payload: z.object({
+    tx: z.string(),
+    partialSign: z.boolean(),
+  }),
+});
+
+export const outgoingMessageSchema = z.discriminatedUnion("type", [txSigRequestedMessageSchema]);
+type OutgoingMessage = z.infer<typeof outgoingMessageSchema>;
