@@ -61,6 +61,7 @@ document.querySelector("#sign")?.addEventListener("click", async () => {
 
     const json: unknown = await buildRes.json();
     const parsed = z.object({ hash: z.string(), complete: z.string() }).parse(json);
+    console.log("tx", parsed.complete);
     console.log("tx hash", parsed.hash);
 
     const signRes = await wallet.signTx(parsed.complete);

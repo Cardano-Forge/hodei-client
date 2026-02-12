@@ -111,7 +111,9 @@ export class Bridge {
           this.debugLog("received connection message");
           deferred.resolve(message.payload);
         } catch (error) {
-          deferred.reject(`Error parsing connection message: ${getFailureReason(error)}`);
+          deferred.reject(
+            `Error parsing connection message ${event.data}: ${getFailureReason(error)}`,
+          );
         } finally {
           connectionController.abort();
         }
@@ -176,7 +178,7 @@ export class Bridge {
               }
             }
           } catch (error) {
-            this.debugLog(`error parsing message: ${getFailureReason(error)}`);
+            this.debugLog(`error parsing message ${event.data}: ${getFailureReason(error)}`);
           }
         },
         { signal: connection.controller.signal },

@@ -229,7 +229,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
 
             controller.abort();
           } catch (error) {
-            bridge.debugLog(`error parsing message: ${getFailureReason(error)}`);
+            bridge.debugLog(`error parsing message ${event.data}: ${getFailureReason(error)}`);
           }
         },
         { signal: controller.signal },
