@@ -372,39 +372,57 @@ const walletUpdatedMessageSchema = z.object({
   }),
 });
 
-const signTxAcceptedMessageSchema = z.object({
-  type: z.literal("client.sign_tx_accepted"),
-  payload: z.object({
-    tx: z.string(),
-    signature: z.string(),
-  }),
+const sigReqAcceptedMessageSchema = z.object({
+  type: z.literal("client.sig_req_accepted"),
+  payload: z.union([
+    z.object({
+      tx: z.string(),
+      signature: z.string(),
+    }),
+    z.object({
+      data: z.string(),
+      signature: z.string(),
+    }),
+  ]),
 });
 
-const signTxRejectedMessageSchema = z.object({
-  type: z.literal("client.sign_tx_rejected"),
-  payload: z.object({
-    tx: z.string(),
-    reason: z.string(),
-  }),
+const sigReqRejectedMessageSchema = z.object({
+  type: z.literal("client.sig_req_rejected"),
+  payload: z.union([
+    z.object({
+      tx: z.string(),
+      reason: z.string(),
+    }),
+    z.object({
+      data: z.string(),
+      reason: z.string(),
+    }),
+  ]),
 });
 
-export const signTxResponseMessageSchema = z.discriminatedUnion("type", [
-  signTxAcceptedMessageSchema,
-  signTxRejectedMessageSchema,
+export const sigReqResponseMessageSchema = z.discriminatedUnion("type", [
+  sigReqAcceptedMessageSchema,
+  sigReqRejectedMessageSchema,
 ]);
 
 const incomingMessageSchema = z.discriminatedUnion("type", [
   walletUpdatedMessageSchema,
-  signTxResponseMessageSchema,
+  sigReqResponseMessageSchema,
 ]);
 
-const signTxRequestedMessageSchema = z.object({
-  type: z.literal("client.sign_tx_requested"),
-  payload: z.object({
-    tx: z.string(),
-    partialSign: z.boolean(),
-  }),
+const sigReqCreatedMessageSchema = z.object({
+  type: z.literal("client.sig_req_created"),
+  payload: z.union([
+    z.object({
+      tx: z.string(),
+      partialSign: z.boolean(),
+    }),
+    z.object({
+      data: z.string(),
+      address: z.string(),
+    }),
+  ]),
 });
 
-export const outgoingMessageSchema = z.discriminatedUnion("type", [signTxRequestedMessageSchema]);
+export const outgoingMessageSchema = z.discriminatedUnion("type", [sigReqCreatedMessageSchema]);
 type OutgoingMessage = z.infer<typeof outgoingMessageSchema>;
