@@ -1,4 +1,4 @@
-import z from "zod";
+import * as z from "zod/mini";
 import type { EnabledWalletApi } from "./api";
 import { DEFAULT_CONFIG } from "./config";
 import { initialize } from "./lib";

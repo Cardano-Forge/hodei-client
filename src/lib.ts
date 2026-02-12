@@ -3,7 +3,7 @@ import {
   type BridgeOpts,
   type BridgeState,
   checkToken,
-  txSigReceivedMessageSchema,
+  signTxResponseMessageSchema,
 } from "./bridge";
 import { addCommandListener, sendCommand, type Command } from "./command";
 import { DEFAULT_CONFIG, type Config } from "./config";
@@ -216,15 +216,15 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
         (event) => {
           try {
             const json = JSON.parse(event.data);
-            const message = txSigReceivedMessageSchema.parse(json);
+            const message = signTxResponseMessageSchema.parse(json);
             if (message.payload.tx !== tx) {
               return;
             }
 
-            if (message.type === "client.tx_sig_accepted") {
+            if (message.type === "client.sign_tx_accepted") {
               deferred.resolve(message.payload.signature);
             } else {
-              deferred.reject("Rejected by user");
+              deferred.reject(`Rejected by user: ${message.payload.reason}`);
             }
 
             controller.abort();
@@ -236,7 +236,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       );
 
       bridge.send({
-        type: "client.tx_sig_requested",
+        type: "client.sign_tx_requested",
         payload: { tx, partialSign },
       });
 

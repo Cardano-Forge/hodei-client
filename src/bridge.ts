@@ -370,38 +370,39 @@ const walletUpdatedMessageSchema = z.object({
   }),
 });
 
-const txSigAcceptedMessageSchema = z.object({
-  type: z.literal("client.tx_sig_accepted"),
+const signTxAcceptedMessageSchema = z.object({
+  type: z.literal("client.sign_tx_accepted"),
   payload: z.object({
     tx: z.string(),
     signature: z.string(),
   }),
 });
 
-const txSigRejectedMessageSchema = z.object({
-  type: z.literal("client.tx_sig_rejected"),
+const signTxRejectedMessageSchema = z.object({
+  type: z.literal("client.sign_tx_rejected"),
   payload: z.object({
     tx: z.string(),
+    reason: z.string(),
   }),
 });
 
-export const txSigReceivedMessageSchema = z.discriminatedUnion("type", [
-  txSigAcceptedMessageSchema,
-  txSigRejectedMessageSchema,
+export const signTxResponseMessageSchema = z.discriminatedUnion("type", [
+  signTxAcceptedMessageSchema,
+  signTxRejectedMessageSchema,
 ]);
 
 const incomingMessageSchema = z.discriminatedUnion("type", [
   walletUpdatedMessageSchema,
-  txSigReceivedMessageSchema,
+  signTxResponseMessageSchema,
 ]);
 
-const txSigRequestedMessageSchema = z.object({
-  type: z.literal("client.tx_sig_requested"),
+const signTxRequestedMessageSchema = z.object({
+  type: z.literal("client.sign_tx_requested"),
   payload: z.object({
     tx: z.string(),
     partialSign: z.boolean(),
   }),
 });
 
-export const outgoingMessageSchema = z.discriminatedUnion("type", [txSigRequestedMessageSchema]);
+export const outgoingMessageSchema = z.discriminatedUnion("type", [signTxRequestedMessageSchema]);
 type OutgoingMessage = z.infer<typeof outgoingMessageSchema>;
