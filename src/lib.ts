@@ -211,13 +211,15 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
 
       const deferred = deferredPromise<string>();
 
+      const requestId = crypto.randomUUID();
+
       bridge.connection.ws.addEventListener(
         "message",
         (event) => {
           try {
             const json = JSON.parse(event.data);
             const message = sigReqResponseMessageSchema.parse(json);
-            if (!("tx" in message.payload) || message.payload.tx !== tx) {
+            if (message.payload.requestId !== requestId) {
               return;
             }
 
@@ -237,7 +239,11 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
 
       bridge.send({
         type: "client.sig_req_created",
-        payload: { tx, partialSign },
+        payload: {
+          requestId,
+          tx,
+          partialSign,
+        },
       });
 
       return deferred.promise;

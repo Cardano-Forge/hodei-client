@@ -374,30 +374,18 @@ const walletUpdatedMessageSchema = z.object({
 
 const sigReqAcceptedMessageSchema = z.object({
   type: z.literal("client.sig_req_accepted"),
-  payload: z.union([
-    z.object({
-      tx: z.string(),
-      signature: z.string(),
-    }),
-    z.object({
-      data: z.string(),
-      signature: z.string(),
-    }),
-  ]),
+  payload: z.object({
+    requestId: z.string(),
+    signature: z.string(),
+  }),
 });
 
 const sigReqRejectedMessageSchema = z.object({
   type: z.literal("client.sig_req_rejected"),
-  payload: z.union([
-    z.object({
-      tx: z.string(),
-      reason: z.string(),
-    }),
-    z.object({
-      data: z.string(),
-      reason: z.string(),
-    }),
-  ]),
+  payload: z.object({
+    requestId: z.string(),
+    reason: z.string(),
+  }),
 });
 
 export const sigReqResponseMessageSchema = z.discriminatedUnion("type", [
@@ -414,10 +402,12 @@ const sigReqCreatedMessageSchema = z.object({
   type: z.literal("client.sig_req_created"),
   payload: z.union([
     z.object({
+      requestId: z.string(),
       tx: z.string(),
       partialSign: z.boolean(),
     }),
     z.object({
+      requestId: z.string(),
       data: z.string(),
       address: z.string(),
     }),
