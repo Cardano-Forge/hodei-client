@@ -4,11 +4,11 @@
   import type { BridgeState } from "./bridge";
   import { addCommandListener, sendCommand, type Command } from "./command";
 
-  let bridgeState = $state<BridgeState>();
+  let bridgeState = $state<BridgeState | { status: "disconnecting"; shouldUnlink: boolean }>();
   let dialogEl = $state<HTMLDialogElement>();
 
   $effect(() => {
-    if (bridgeState?.status === "pairing") {
+    if (bridgeState?.status === "pairing" || bridgeState?.status === "disconnecting") {
       dialogEl?.showModal();
     } else if (dialogEl?.open) {
       dialogEl.close();
@@ -16,7 +16,20 @@
   });
 
   function handleDialogClose() {
-    sendCommand($host(), { type: "dialog_closed" });
+    switch (bridgeState?.status) {
+      case "pairing": {
+        sendCommand($host(), {
+          type: "dialog_closed",
+        });
+        break;
+      }
+      case "disconnecting": {
+        sendCommand($host(), {
+          type: bridgeState.shouldUnlink ? "unlinked" : "disconnected",
+        });
+        break;
+      }
+    }
   }
 
   $effect(() => {
@@ -28,6 +41,10 @@
     switch (command.type) {
       case "state_changed": {
         bridgeState = command.payload;
+        break;
+      }
+      case "disconnecting": {
+        bridgeState = { status: "disconnecting", shouldUnlink: false };
         break;
       }
     }
@@ -71,14 +88,44 @@
     }
   }}
 >
-  {#if bridgeState?.status === "pairing"}
-    <article>
-      <img src="https://ik.imagekit.io/pizzli/cforge/logo.png" alt="hodei" />
+  <article>
+    <img src="https://ik.imagekit.io/pizzli/cforge/logo.png" alt="hodei" />
+    {#if bridgeState?.status === "pairing"}
       <h1>Pairing</h1>
       <h2>{bridgeState.pin}</h2>
       <p>Enter this code on the Hodei app to pair your wallet</p>
-    </article>
-  {/if}
+    {:else if bridgeState?.status === "disconnecting"}
+      <h1>Disconnecting</h1>
+      <p>Do you want to unlink your wallet from the Hodei app or disconnect only?</p>
+      <footer>
+        <button
+          class="tonal"
+          onclick={() => {
+            if (bridgeState?.status === "disconnecting") {
+              bridgeState.shouldUnlink = true;
+            }
+            dialogEl?.close();
+          }}
+        >
+          Unlink
+        </button>
+        <button
+          onclick={() => {
+            if (bridgeState?.status === "disconnecting") {
+              bridgeState.shouldUnlink = false;
+            }
+            dialogEl?.close();
+          }}
+        >
+          Disconnect only
+        </button>
+      </footer>
+    {:else}
+      <h1>Hodei client</h1>
+      <p>This is a Hodei client for your wallet</p>
+      <button onclick={() => dialogEl?.close()}>Close</button>
+    {/if}
+  </article>
 </dialog>
 
 {#if bridgeState}
@@ -130,13 +177,6 @@
     color: #1e191e;
   }
 
-  @media (prefers-color-scheme: dark) {
-    article {
-      background: linear-gradient(to bottom right, #362a36, #181215);
-      color: #eadfe6;
-    }
-  }
-
   h1 {
     margin: 12px 0 16px 0;
     font-size: 20px;
@@ -144,12 +184,12 @@
   }
 
   p {
-    margin: 24px 0 0 0;
+    margin: 0;
     font-size: 14px;
   }
 
   h2 {
-    margin: 0;
+    margin: 0 0 24px 0;
     font-size: 24px;
     font-weight: 600;
     letter-spacing: 0.2em;
@@ -158,5 +198,60 @@
   img {
     width: 75;
     height: 75px;
+  }
+
+  button {
+    --bg: #69548e;
+    --fg: #ffffff;
+    background: var(--bg);
+    color: var(--fg);
+    outline: none;
+    border: none;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease-in-out;
+  }
+  button:hover {
+    cursor: pointer;
+    --bg: #746197;
+    --fg: #ffffff;
+  }
+  button.tonal {
+    --bg: #e8dff8;
+    --fg: #1e182b;
+  }
+  button.tonal:hover {
+    --bg: #d9cfe7;
+    --fg: #1f182b;
+  }
+
+  footer {
+    margin-top: 24px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    article {
+      background: linear-gradient(to bottom right, #362a36, #181215);
+      color: #eadfe6;
+    }
+    button {
+      --bg: #d3bcfd;
+      --fg: #37265c;
+    }
+    button:hover {
+      --bg: #c6b0f0;
+      --fg: #37265c;
+    }
+    button.tonal {
+      --bg: #4b4358;
+      --fg: #e8dff8;
+    }
+    button.tonal:hover {
+      --bg: #574f63;
+      --fg: #e9def8;
+    }
   }
 </style>

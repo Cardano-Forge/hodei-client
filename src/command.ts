@@ -37,6 +37,18 @@ export function parseCommandEvent(event: Event): Command | undefined {
   return parsed.data;
 }
 
+const disconnectingCommandSchema = z.object({
+  type: z.enum(["disconnecting"]),
+});
+
+const disconnectedCommandSchema = z.object({
+  type: z.enum(["disconnected"]),
+});
+
+const unlinkedCommandSchema = z.object({
+  type: z.enum(["unlinked"]),
+});
+
 const stateChangedCommandSchema = z.object({
   type: z.enum(["state_changed"]),
   payload: bridgeStateSchema,
@@ -47,6 +59,9 @@ const dialogClosedCommandSchema = z.object({
 });
 
 const commandSchema = z.discriminatedUnion("type", [
+  disconnectingCommandSchema,
+  disconnectedCommandSchema,
+  unlinkedCommandSchema,
   stateChangedCommandSchema,
   dialogClosedCommandSchema,
 ]);
