@@ -80,6 +80,10 @@ export class Bridge {
     this._connection = undefined;
   }
 
+  unlink(): void {
+    this.send({ type: "client.session_unlinked", payload: {} });
+  }
+
   getState(): BridgeState | undefined {
     return this.connection?.state;
   }
@@ -398,6 +402,11 @@ const incomingMessageSchema = z.discriminatedUnion("type", [
   sigReqResponseMessageSchema,
 ]);
 
+const sessionUnlinkedMessageSchema = z.object({
+  type: z.literal("client.session_unlinked"),
+  payload: z.object({}),
+});
+
 const sigReqCreatedMessageSchema = z.object({
   type: z.literal("client.sig_req_created"),
   payload: z.union([
@@ -414,5 +423,8 @@ const sigReqCreatedMessageSchema = z.object({
   ]),
 });
 
-export const outgoingMessageSchema = z.discriminatedUnion("type", [sigReqCreatedMessageSchema]);
+export const outgoingMessageSchema = z.discriminatedUnion("type", [
+  sigReqCreatedMessageSchema,
+  sessionUnlinkedMessageSchema,
+]);
 type OutgoingMessage = z.infer<typeof outgoingMessageSchema>;

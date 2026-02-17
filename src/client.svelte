@@ -4,11 +4,11 @@
   import type { BridgeState } from "./bridge";
   import { addCommandListener, sendCommand, type Command } from "./command";
 
-  let bridgeState = $state<BridgeState>();
+  let bridgeState = $state<BridgeState | { status: "disconnecting"; shouldUnlink: boolean }>();
   let dialogEl = $state<HTMLDialogElement>();
 
   $effect(() => {
-    if (bridgeState?.status === "pairing") {
+    if (bridgeState?.status === "pairing" || bridgeState?.status === "disconnecting") {
       dialogEl?.showModal();
     } else if (dialogEl?.open) {
       dialogEl.close();
@@ -16,7 +16,20 @@
   });
 
   function handleDialogClose() {
-    sendCommand($host(), { type: "dialog_closed" });
+    switch (bridgeState?.status) {
+      case "pairing": {
+        sendCommand($host(), {
+          type: "dialog_closed",
+        });
+        break;
+      }
+      case "disconnecting": {
+        sendCommand($host(), {
+          type: bridgeState.shouldUnlink ? "unlinked" : "disconnected",
+        });
+        break;
+      }
+    }
   }
 
   $effect(() => {
@@ -28,6 +41,10 @@
     switch (command.type) {
       case "state_changed": {
         bridgeState = command.payload;
+        break;
+      }
+      case "disconnecting": {
+        bridgeState = { status: "disconnecting", shouldUnlink: false };
         break;
       }
     }
@@ -71,14 +88,43 @@
     }
   }}
 >
-  {#if bridgeState?.status === "pairing"}
-    <article>
-      <img src="https://ik.imagekit.io/pizzli/cforge/logo.png" alt="hodei" />
+  <article>
+    <img src="https://ik.imagekit.io/pizzli/cforge/logo.png" alt="hodei" />
+    {#if bridgeState?.status === "pairing"}
       <h1>Pairing</h1>
       <h2>{bridgeState.pin}</h2>
       <p>Enter this code on the Hodei app to pair your wallet</p>
-    </article>
-  {/if}
+    {:else if bridgeState?.status === "disconnecting"}
+      <h1>Disconnecting</h1>
+      <p>Do you want to unlink your wallet from the Hodei app or disconnect only?</p>
+      <footer>
+        <button
+          onclick={() => {
+            if (bridgeState?.status === "disconnecting") {
+              bridgeState.shouldUnlink = true;
+            }
+            dialogEl?.close();
+          }}
+        >
+          Unlink
+        </button>
+        <button
+          onclick={() => {
+            if (bridgeState?.status === "disconnecting") {
+              bridgeState.shouldUnlink = false;
+            }
+            dialogEl?.close();
+          }}
+        >
+          Disconnect only
+        </button>
+      </footer>
+    {:else}
+      <h1>Hodei client</h1>
+      <p>This is a Hodei client for your wallet</p>
+      <button onclick={() => dialogEl?.close()}>Close</button>
+    {/if}
+  </article>
 </dialog>
 
 {#if bridgeState}

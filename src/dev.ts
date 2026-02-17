@@ -70,3 +70,7 @@ document.querySelector("#sign")?.addEventListener("click", async () => {
     console.error(error);
   }
 });
+
+document.querySelector("#disconnect")?.addEventListener("click", async () => {
+  wallet?.disconnect?.();
+});

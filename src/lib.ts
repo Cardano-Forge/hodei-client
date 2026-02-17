@@ -137,8 +137,25 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
   addCommandListener(
     client.element,
     (command) => {
-      if (command.type === "dialog_closed" && bridge.getState()?.status === "pairing") {
-        bridge.disconnect();
+      switch (command.type) {
+        case "dialog_closed": {
+          if (bridge.getState()?.status === "pairing") {
+            bridge.disconnect();
+          }
+          break;
+        }
+        case "disconnected": {
+          bridge.disconnect();
+          break;
+        }
+        case "unlinked": {
+          bridge.unlink();
+          break;
+        }
+        default: {
+          bridge.debugLog(`unhandled command received from client: ${JSON.stringify(command)}`);
+          break;
+        }
       }
     },
     { signal: bridge.connection?.controller.signal },
@@ -266,7 +283,8 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       }
     },
     disconnect: async () => {
-      bridge.disconnect();
+      client.sendCommand({ type: "disconnecting" });
+      // bridge.disconnect();
     },
   };
 
