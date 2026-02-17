@@ -422,6 +422,7 @@ const sigReqCreatedMessageSchema = z.object({
     }),
   ]),
 });
+export type SigReqCreatedMessage = z.infer<typeof sigReqCreatedMessageSchema>;
 
 export const outgoingMessageSchema = z.discriminatedUnion("type", [
   sigReqCreatedMessageSchema,
