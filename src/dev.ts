@@ -34,7 +34,7 @@ document.querySelector("#toggle")?.addEventListener("click", async () => {
   document.body.appendChild(el);
 });
 
-document.querySelector("#sign")?.addEventListener("click", async () => {
+document.querySelector("#sign-tx")?.addEventListener("click", async () => {
   try {
     if (!wallet) {
       throw new Error("wallet not connected");
@@ -66,6 +66,45 @@ document.querySelector("#sign")?.addEventListener("click", async () => {
 
     const signRes = await wallet.signTx(parsed.complete);
     console.log("signed tx", signRes);
+  } catch (error) {
+    console.error(error);
+  }
+});
+
+function utf8ToHex(input: string) {
+  const encoder = new TextEncoder();
+  const encoded = encoder.encode(input);
+  return Array.from(encoded, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+document.querySelector("#sign-data-stake")?.addEventListener("click", async () => {
+  try {
+    if (!wallet) {
+      throw new Error("wallet not connected");
+    }
+    const data = utf8ToHex("hello world!");
+    console.log("data", data);
+    const [rewardAddress] = await wallet.getRewardAddresses();
+    if (!rewardAddress) {
+      throw new Error("no reward address");
+    }
+    const signRes = await wallet.signData(rewardAddress, data);
+    console.log("signRes", signRes);
+  } catch (error) {
+    console.error(error);
+  }
+});
+
+document.querySelector("#sign-data-payment")?.addEventListener("click", async () => {
+  try {
+    if (!wallet) {
+      throw new Error("wallet not connected");
+    }
+    const data = utf8ToHex("hello world!");
+    console.log("data", data);
+    const changeAddress = await wallet.getChangeAddress();
+    const signRes = await wallet.signData(changeAddress, data);
+    console.log("signRes", signRes);
   } catch (error) {
     console.error(error);
   }

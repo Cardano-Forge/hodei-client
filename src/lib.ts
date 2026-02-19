@@ -170,7 +170,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
     return bridgeState;
   };
 
-  const handleSigReq = async (payload: SigReqCreatedMessage["payload"]) => {
+  const handleSigReq = async (payload: SigReqCreatedMessage["payload"]): Promise<string> => {
     ensurePaired();
 
     if (!bridge.isConnected()) {
@@ -269,11 +269,21 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       });
     },
     signData: async (address, data) => {
-      return handleSigReq({
+      const res = await handleSigReq({
         requestId: crypto.randomUUID(),
         address,
         data,
       });
+
+      const [signature, key] = res.split("::");
+      if (!signature || !key) {
+        throw createApiError("internalError", new Error("Invalid signature"));
+      }
+
+      return {
+        signature,
+        key,
+      };
     },
     submitTx: async (transaction) => {
       const bridgeState = ensurePaired();
