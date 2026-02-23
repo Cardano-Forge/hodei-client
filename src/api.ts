@@ -15,10 +15,15 @@ export type EnabledWalletApi = {
   getChangeAddress(): Promise<string>;
   getRewardAddresses(): Promise<string[]>;
   signTx(tx: string, partialSign?: boolean): Promise<string>;
-  signData(addr: string, payload: string): Promise<string>;
+  signData(addr: string, payload: string): Promise<DataSignature>;
   submitTx(tx: string): Promise<string>;
   /** Non-standard. Used by the Weld wallet connector to allow wallets to clean up on disconnect. */
   disconnect?(): void | Promise<void>;
+};
+
+export type DataSignature = {
+  signature: string;
+  key: string;
 };
 
 export type FullWalletApi = InitialWalletApi & EnabledWalletApi;
