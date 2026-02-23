@@ -84,7 +84,7 @@ function createInitialWalletApi(
         state.promise = enable({
           config: state.config,
           onStateChange: handleStateChange,
-          debug: true, // TODO remove
+          debug: false,
         });
       }
 
