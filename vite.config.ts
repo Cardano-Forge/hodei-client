@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 
 export default defineConfig({
@@ -7,5 +8,9 @@ export default defineConfig({
       name: "hodei",
       formats: ["es"],
     },
+  },
+  test: {
+    environment: "happy-dom",
+    globals: true,
   },
 });

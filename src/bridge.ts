@@ -345,7 +345,7 @@ export async function checkToken(
   return { valid: true, token: input.token };
 }
 
-type ConnectionState =
+export type ConnectionState =
   | {
       status: "pairing";
       sessionId: string;
