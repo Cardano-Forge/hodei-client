@@ -15,9 +15,9 @@
     "preview": "vite preview",
     "check": "tsc --noEmit",
     "lint": "biome check --write .",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "pre": "bun run lint && bun run check && bun run build"
+    "test:watch": "vitest",
+    "test": "vitest run",
+    "pre": "bun run lint && bun run check && bun run build && bun run test"
   },
   "type": "module"
 }

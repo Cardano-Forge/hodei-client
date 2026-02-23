@@ -175,7 +175,7 @@ describe("wallet API (paired)", () => {
 describe("wallet API (not paired)", () => {
   it("all methods throw with code -3 when not paired", async () => {
     const { api, ws } = await enablePairedWallet({
-      onClose: () => {},
+      onClose: () => { },
     });
 
     ws.close(1000, "done");
@@ -350,7 +350,9 @@ describe("isEnabled", () => {
 
 describe("command handling", () => {
   it("dialog_closed while pairing disconnects bridge", async () => {
-    const { ws } = await enablePairingWallet();
+    const { ws } = await enablePairingWallet({
+      onClose: () => { },
+    });
     const el = document.querySelector("hodei-client");
     assert(el);
     expect(ws.closedWith).toBeUndefined();
@@ -363,7 +365,9 @@ describe("command handling", () => {
   });
 
   it("disconnected command disconnects bridge", async () => {
-    const { ws } = await enablePairedWallet();
+    const { ws } = await enablePairedWallet({
+      onClose: () => { },
+    });
     const el = document.querySelector("hodei-client");
     assert(el);
     expect(ws.closedWith).toBeUndefined();
