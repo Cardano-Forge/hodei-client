@@ -1,4 +1,3 @@
-import * as z from "zod/mini";
 import type { Config } from "./config";
 
 export type GetUtxosInput = {
@@ -7,8 +6,7 @@ export type GetUtxosInput = {
   address: string;
 };
 
-const getUtxosOutputSchema = z.array(z.string());
-export type GetUtxosOutput = z.infer<typeof getUtxosOutputSchema>;
+export type GetUtxosOutput = string[];
 
 export async function getUtxos(input: GetUtxosInput): Promise<GetUtxosOutput> {
   const { baseUrl, apiKey } = input.config.anvil[input.network];
@@ -16,8 +14,7 @@ export async function getUtxos(input: GetUtxosInput): Promise<GetUtxosOutput> {
   url.searchParams.set("address", input.address);
   url.searchParams.set("includeMempool", "true");
   const res = await fetch(url, { headers: { "x-api-key": apiKey } });
-  const json: unknown = await res.json();
-  return getUtxosOutputSchema.parse(json);
+  return res.json() as Promise<GetUtxosOutput>;
 }
 
 export type GetBalanceInput = {
@@ -28,7 +25,9 @@ export type GetBalanceInput = {
 
 export type GetBalanceOutput = string;
 
-export async function getBalance(input: GetBalanceInput): Promise<GetBalanceOutput> {
+export async function getBalance(
+  input: GetBalanceInput,
+): Promise<GetBalanceOutput> {
   const { baseUrl, apiKey } = input.config.anvil[input.network];
   const url = new URL(`${baseUrl}/wallets/balance`);
   url.searchParams.set("address", input.address);
@@ -42,16 +41,15 @@ export type SubmitTxInput = {
   transaction: string;
 };
 
-const submitTxOutputSchema = z.object({
-  txHash: z.string(),
-});
-type SubmitTxOutput = z.infer<typeof submitTxOutputSchema>;
+type SubmitTxOutput = { txHash: string };
 
 export async function submitTx(input: SubmitTxInput): Promise<SubmitTxOutput> {
   const { baseUrl, apiKey } = input.config.anvil[input.network];
   const url = new URL(`${baseUrl}/transactions/submit`);
   url.searchParams.set("transaction", input.transaction);
-  const res = await fetch(url, { method: "POST", headers: { "x-api-key": apiKey } });
-  const json: unknown = await res.json();
-  return submitTxOutputSchema.parse(json);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "x-api-key": apiKey },
+  });
+  return res.json() as Promise<SubmitTxOutput>;
 }

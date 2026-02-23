@@ -27,6 +27,8 @@ export const DEFAULT_CONFIG: Config = {
       apiKey: "testnet_C301LOscFsUccwR4zCqEtTJvizEAUc3AaVhRDdcY",
     },
   },
-  onError: ({ error }) => console.error("[HODEI] unhandled error:", error ?? "unknown"),
-  onClose: ({ code, reason }) => console.error("[HODEI] unhandled closure:", code, reason),
+  onError: ({ error }) =>
+    console.error("[HODEI] unhandled error:", error ?? "unknown"),
+  onClose: ({ code, reason }) =>
+    console.error("[HODEI] unhandled closure:", code, reason),
 };

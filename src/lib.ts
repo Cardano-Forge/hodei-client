@@ -1,20 +1,22 @@
+import { getBalance, getUtxos, submitTx } from "./anvil";
+import type { EnabledWalletApi, InitialWalletApi } from "./api";
 import {
+  assertSigReqResponse,
   Bridge,
   type BridgeOpts,
   type BridgeState,
   checkToken,
-  sigReqResponseMessageSchema,
   type SigReqCreatedMessage,
 } from "./bridge";
-import { addCommandListener, sendCommand, type Command } from "./command";
-import { DEFAULT_CONFIG, type Config } from "./config";
-import type { EnabledWalletApi, InitialWalletApi } from "./api";
-import { deferredPromise, getFailureReason } from "./utils";
-import { getBalance, getUtxos, submitTx } from "./anvil";
+import { addCommandListener, type Command, sendCommand } from "./command";
+import { type Config, DEFAULT_CONFIG } from "./config";
 import { createApiError, createTxSendError } from "./error";
 import { getToken } from "./storage";
+import { deferredPromise, getFailureReason } from "./utils";
 
-export function initialize(config?: Partial<Config>): InitialWalletApi | undefined {
+export function initialize(
+  config?: Partial<Config>,
+): InitialWalletApi | undefined {
   if (typeof window === "undefined") {
     return undefined;
   }
@@ -36,7 +38,9 @@ type State = {
   resolved?: EnableOutput;
 };
 
-function createInitialWalletApi(initialConfig: Partial<Config> = {}): InitialWalletApi {
+function createInitialWalletApi(
+  initialConfig: Partial<Config> = {},
+): InitialWalletApi {
   const state: State = {
     config: {
       ...DEFAULT_CONFIG,
@@ -58,6 +62,7 @@ function createInitialWalletApi(initialConfig: Partial<Config> = {}): InitialWal
 
     if (state.resolved) {
       state.resolved?.client.sendCommand({
+        sender: "wallet",
         type: "state_changed",
         payload: bridgeState,
       });
@@ -138,6 +143,9 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
   addCommandListener(
     client.element,
     (command) => {
+      if (command.sender !== "client") {
+        return;
+      }
       switch (command.type) {
         case "dialog_closed": {
           if (bridge.getState()?.status === "pairing") {
@@ -154,7 +162,9 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
           break;
         }
         default: {
-          bridge.debugLog(`unhandled command received from client: ${JSON.stringify(command)}`);
+          bridge.debugLog(
+            `unhandled command received from client: ${JSON.stringify(command)}`,
+          );
           break;
         }
       }
@@ -170,7 +180,9 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
     return bridgeState;
   };
 
-  const handleSigReq = async (payload: SigReqCreatedMessage["payload"]): Promise<string> => {
+  const handleSigReq = async (
+    payload: SigReqCreatedMessage["payload"],
+  ): Promise<string> => {
     ensurePaired();
 
     if (!bridge.isConnected()) {
@@ -178,9 +190,13 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
     }
 
     const controller = new AbortController();
-    bridge.connection.controller.signal.addEventListener("abort", () => controller.abort(), {
-      signal: controller.signal,
-    });
+    bridge.connection.controller.signal.addEventListener(
+      "abort",
+      () => controller.abort(),
+      {
+        signal: controller.signal,
+      },
+    );
 
     const deferred = deferredPromise<string>();
 
@@ -189,7 +205,8 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       (event) => {
         try {
           const json = JSON.parse(event.data);
-          const message = sigReqResponseMessageSchema.parse(json);
+          assertSigReqResponse(json);
+          const message = json;
           if (message.payload.requestId !== payload.requestId) {
             return;
           }
@@ -202,7 +219,9 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
 
           controller.abort();
         } catch (error) {
-          bridge.debugLog(`error parsing message ${event.data}: ${getFailureReason(error)}`);
+          bridge.debugLog(
+            `error parsing message ${event.data}: ${getFailureReason(error)}`,
+          );
         }
       },
       { signal: controller.signal },
@@ -300,7 +319,10 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       }
     },
     disconnect: async () => {
-      client.sendCommand({ type: "disconnecting" });
+      client.sendCommand({
+        sender: "wallet",
+        type: "disconnecting",
+      });
     },
   };
 
@@ -318,16 +340,19 @@ export type MountClientOutput = {
 
 async function mountClient(): Promise<MountClientOutput> {
   if (!customElements.get("hodei-client")) {
-    await import("./client.svelte");
+    const client = await import("./client");
+    customElements.define("hodei-client", client.HodeiClient);
   }
 
   let element = document.querySelector("hodei-client") ?? undefined;
   if (!element) {
     element = document.createElement("hodei-client");
-    document.body.appendChild(element);
 
     const mounted = deferredPromise<void>();
-    element.addEventListener("mounted", () => mounted.resolve(), { once: true });
+    element.addEventListener("mounted", () => mounted.resolve(), {
+      once: true,
+    });
+    document.body.appendChild(element);
     await mounted.promise;
   }
 

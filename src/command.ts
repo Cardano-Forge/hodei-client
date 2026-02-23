@@ -1,5 +1,4 @@
-import * as z from "zod/mini";
-import { bridgeStateSchema } from "./bridge";
+import { type BridgeState, isBridgeState } from "./bridge";
 
 export function sendCommand(element: Element, command: Command) {
   element.dispatchEvent(new CustomEvent("command", { detail: command }));
@@ -29,41 +28,27 @@ export function parseCommandEvent(event: Event): Command | undefined {
     return undefined;
   }
 
-  const parsed = commandSchema.safeParse(event.detail);
-  if (!parsed.success) {
-    return undefined;
-  }
-
-  return parsed.data;
+  return isCommand(event.detail) ? event.detail : undefined;
 }
 
-const disconnectingCommandSchema = z.object({
-  type: z.enum(["disconnecting"]),
-});
+export type Command =
+  | { sender: "wallet"; type: "disconnecting" }
+  | { sender: "client"; type: "disconnected" }
+  | { sender: "client"; type: "unlinked" }
+  | { sender: "wallet"; type: "state_changed"; payload: BridgeState }
+  | { sender: "client"; type: "dialog_closed" };
 
-const disconnectedCommandSchema = z.object({
-  type: z.enum(["disconnected"]),
-});
-
-const unlinkedCommandSchema = z.object({
-  type: z.enum(["unlinked"]),
-});
-
-const stateChangedCommandSchema = z.object({
-  type: z.enum(["state_changed"]),
-  payload: bridgeStateSchema,
-});
-
-const dialogClosedCommandSchema = z.object({
-  type: z.literal("dialog_closed"),
-});
-
-const commandSchema = z.discriminatedUnion("type", [
-  disconnectingCommandSchema,
-  disconnectedCommandSchema,
-  unlinkedCommandSchema,
-  stateChangedCommandSchema,
-  dialogClosedCommandSchema,
+const commandTypes = new Set([
+  "disconnecting",
+  "disconnected",
+  "unlinked",
+  "dialog_closed",
 ]);
 
-export type Command = z.infer<typeof commandSchema>;
+function isCommand(value: unknown): value is Command {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.type !== "string") return false;
+  if (commandTypes.has(v.type)) return true;
+  return v.type === "state_changed" && isBridgeState(v.payload);
+}
