@@ -151,8 +151,7 @@ describe("wallet API (paired)", () => {
 
   it("getBalance delegates to anvil", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve({}),
-      text: () => Promise.resolve("1000000"),
+      json: () => Promise.resolve("1000000"),
     });
     vi.stubGlobal("fetch", mockFetch);
     const { api } = await enablePairedWallet();

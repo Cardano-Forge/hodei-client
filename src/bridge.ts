@@ -5,7 +5,6 @@ import { deferredPromise, getFailureReason } from "./utils";
 export type BridgeOpts = {
   config: Config;
   onStateChange(state: BridgeState): void;
-  debug?: boolean;
 };
 
 export type BridgeConnection = {
@@ -26,7 +25,7 @@ export class Bridge {
   constructor(opts: BridgeOpts) {
     this._config = opts.config;
     this._onStateChange = opts.onStateChange;
-    this._debug = opts.debug ?? false;
+    this._debug = opts.config?.debug ?? false;
   }
 
   setDebug(debug: boolean) {

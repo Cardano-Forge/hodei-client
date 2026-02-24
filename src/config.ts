@@ -9,6 +9,7 @@ export type Config = {
       apiKey: string;
     }
   >;
+  debug?: boolean;
   onError(data: { error?: string }): void;
   onClose(data: { code: number; reason: string }): void;
 };

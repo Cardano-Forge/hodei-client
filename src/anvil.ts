@@ -32,7 +32,7 @@ export async function getBalance(
   const url = new URL(`${baseUrl}/wallets/balance`);
   url.searchParams.set("address", input.address);
   const res = await fetch(url, { headers: { "x-api-key": apiKey } });
-  return res.text();
+  return res.json();
 }
 
 export type SubmitTxInput = {
