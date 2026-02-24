@@ -3,6 +3,7 @@ import { DEFAULT_CONFIG } from "./config";
 import { initialize } from "./lib";
 
 initialize({
+  debug: true,
   onError: ({ error }) => console.log("socket error:", error ?? "unknown"),
   onClose: ({ code, reason }) => console.log("socket closed:", code, reason),
 });
