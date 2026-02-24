@@ -127,7 +127,7 @@ function createInitialWalletApi(
   };
 }
 
-export type EnableOutput = {
+type EnableOutput = {
   api: EnabledWalletApi;
   bridge: Bridge;
   client: MountClientOutput;
@@ -333,7 +333,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
   };
 }
 
-export type MountClientOutput = {
+type MountClientOutput = {
   element: Element;
   sendCommand: (command: Command) => void;
 };

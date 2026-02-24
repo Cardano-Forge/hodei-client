@@ -1,4 +1,5 @@
 /// <reference types="vitest/config" />
+import dts from "unplugin-dts/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
@@ -6,9 +7,10 @@ export default defineConfig({
     lib: {
       entry: "src/lib.ts",
       name: "hodei",
-      formats: ["es"],
+      fileName: "lib",
     },
   },
+  plugins: [dts({ bundleTypes: true })],
   test: {
     environment: "happy-dom",
     globals: true,
