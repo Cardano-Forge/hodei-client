@@ -1,6 +1,7 @@
 import { getBalance, getUtxos, submitTx } from "./anvil";
 import type { EnabledWalletApi, InitialWalletApi } from "./api";
 import {
+  assertIncomingMessage,
   assertSigReqResponse,
   Bridge,
   type BridgeOpts,
@@ -13,6 +14,8 @@ import { type Config, DEFAULT_CONFIG } from "./config";
 import { createApiError, createTxSendError } from "./error";
 import { getToken } from "./storage";
 import { deferredPromise, getFailureReason } from "./utils";
+
+export type { Config };
 
 export function initialize(
   config?: Partial<Config>,
@@ -92,6 +95,13 @@ function createInitialWalletApi(
 
         state.resolved = resolved;
 
+        if (state.config.waitForPairing) {
+          await resolved.pairingPromise;
+        } else {
+          // Handle promise rejection
+          resolved.pairingPromise.catch(() => { });
+        }
+
         return resolved.api;
       } finally {
         state.promise = undefined;
@@ -130,6 +140,7 @@ type EnableOutput = {
   api: EnabledWalletApi;
   bridge: Bridge;
   client: MountClientOutput;
+  pairingPromise: Promise<void>;
 };
 
 async function enable(input: BridgeOpts): Promise<EnableOutput> {
@@ -325,10 +336,46 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
     },
   };
 
+  const pairingPromise = deferredPromise<void>();
+  if (bridge.connection && bridge.getState()?.status === "pairing") {
+    const controller = new AbortController();
+
+    bridge.connection.controller.signal.addEventListener(
+      "abort",
+      () => {
+        controller.abort();
+        pairingPromise.reject(new Error("Aborted"));
+      },
+      {
+        signal: controller.signal,
+      },
+    );
+
+    bridge.connection.ws.addEventListener(
+      "message",
+      (event) => {
+        try {
+          const json = JSON.parse(event.data);
+          assertIncomingMessage(json);
+          if (json.type === "client.wallet_updated") {
+            pairingPromise.resolve();
+            controller.abort();
+          }
+        } catch { }
+      },
+      {
+        signal: controller.signal,
+      },
+    );
+  } else {
+    pairingPromise.resolve();
+  }
+
   return {
     api,
     bridge,
     client,
+    pairingPromise: pairingPromise.promise,
   };
 }
 

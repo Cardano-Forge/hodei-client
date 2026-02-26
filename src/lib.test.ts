@@ -350,6 +350,7 @@ describe("isEnabled", () => {
 describe("command handling", () => {
   it("dialog_closed while pairing disconnects bridge", async () => {
     const { ws } = await enablePairingWallet({
+      waitForPairing: false,
       onClose: () => {},
     });
     const el = document.querySelector("hodei-client");

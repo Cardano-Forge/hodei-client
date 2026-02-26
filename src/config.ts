@@ -9,7 +9,8 @@ export type Config = {
       apiKey: string;
     }
   >;
-  debug?: boolean;
+  debug: boolean;
+  waitForPairing: boolean;
   onError(data: { error?: string }): void;
   onClose(data: { code: number; reason: string }): void;
 };
@@ -28,6 +29,8 @@ export const DEFAULT_CONFIG: Config = {
       apiKey: "testnet_C301LOscFsUccwR4zCqEtTJvizEAUc3AaVhRDdcY",
     },
   },
+  debug: false,
+  waitForPairing: true,
   onError: ({ error }) =>
     console.error("[HODEI] unhandled error:", error ?? "unknown"),
   onClose: ({ code, reason }) =>

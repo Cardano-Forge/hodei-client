@@ -437,7 +437,7 @@ const incomingMessageTypes = new Set([
   "client.sig_req_rejected",
 ]);
 
-function assertIncomingMessage(
+export function assertIncomingMessage(
   value: unknown,
 ): asserts value is IncomingMessage {
   if (
