@@ -99,7 +99,7 @@ function createInitialWalletApi(
           await resolved.pairingPromise;
         } else {
           // Handle promise rejection
-          resolved.pairingPromise.catch(() => { });
+          resolved.pairingPromise.catch(() => {});
         }
 
         return resolved.api;
@@ -361,7 +361,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
             pairingPromise.resolve();
             controller.abort();
           }
-        } catch { }
+        } catch {}
       },
       {
         signal: controller.signal,
