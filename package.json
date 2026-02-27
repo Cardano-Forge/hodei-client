@@ -1,5 +1,5 @@
 {
-  "name": "hodei-client",
+  "name": "@ada-anvil/hodei-client",
   "version": "0.0.0",
   "devDependencies": {
     "@biomejs/biome": "2.4.4",
