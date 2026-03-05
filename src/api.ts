@@ -17,8 +17,7 @@ export type EnabledWalletApi = {
   signTx(tx: string, partialSign?: boolean): Promise<string>;
   signData(addr: string, payload: string): Promise<DataSignature>;
   submitTx(tx: string): Promise<string>;
-  /** Non-standard. Used by the Weld wallet connector to allow wallets to clean up on disconnect. */
-  disconnect?(): void | Promise<void>;
+  disconnect(): void | Promise<void>;
 };
 
 export type DataSignature = {
@@ -28,12 +27,10 @@ export type DataSignature = {
 
 export type FullWalletApi = InitialWalletApi & EnabledWalletApi;
 
-export type WindowCardano = {
-  hodei?: InitialWalletApi;
-};
-
 declare global {
   interface Window {
-    cardano?: WindowCardano;
+    cardano?: {
+      hodei?: InitialWalletApi;
+    };
   }
 }

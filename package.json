@@ -1,14 +1,15 @@
 {
-  "name": "hodei-client",
-  "version": "0.0.0",
+  "name": "@ada-anvil/hodei-client",
+  "version": "0.0.1-alpha.0",
   "devDependencies": {
     "@biomejs/biome": "2.4.4",
+    "@microsoft/api-extractor": "^7.57.4",
     "happy-dom": "^20.7.0",
     "typescript": "~5.9.3",
+    "unplugin-dts": "^1.0.0-beta.6",
     "vite": "^7.3.1",
     "vitest": "^4.0.18"
   },
-  "private": true,
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
