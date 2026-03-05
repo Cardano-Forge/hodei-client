@@ -88,7 +88,7 @@ describe("Bridge.connect", () => {
       payload: pairingPayload,
     });
     await p;
-    expect(latestWS().url).toContain("ws://localhost:8000/client/ws");
+    expect(latestWS().url).toContain("/client/ws");
   });
 
   it("connects without token param when no stored token", async () => {
@@ -277,7 +277,7 @@ describe("reconnection", () => {
     }
   });
 
-  it("max 5 attempts then stops reconnecting", async () => {
+  it("max 5 attempts then continues reconnecting with same delay", async () => {
     await connectWithFakeTimers();
 
     latestWS().simulateClose(1006);
@@ -290,9 +290,14 @@ describe("reconnection", () => {
       latestWS().emit("error", { message: "fail" });
     }
 
-    const countAfter = MockWebSocket.instances.length;
-    await vi.advanceTimersByTimeAsync(64000);
-    expect(MockWebSocket.instances.length).toBe(countAfter);
+    const lastDelay = delays[delays.length - 1];
+
+    for (let i = 0; i < 5; i++) {
+      const countBefore = MockWebSocket.instances.length;
+      await vi.advanceTimersByTimeAsync(lastDelay);
+      expect(MockWebSocket.instances.length).toBe(countBefore + 1);
+      latestWS().emit("error", { message: "fail" });
+    }
   });
 });
 

@@ -263,12 +263,8 @@ export class Bridge {
       clearTimeout(this._reconnectTimer);
     }
 
-    if (this._attempts >= 5) {
-      this.debugLog("max reconnect attempts reached");
-      return false;
-    }
-
-    const delay = 2 ** ++this._attempts * 1000;
+    this._attempts = Math.min(this._attempts + 1, 5);
+    const delay = 2 ** this._attempts * 1000;
     this.debugLog(`reconnecting in ${delay / 1000}s`);
 
     const timer = setTimeout(() => {

@@ -17,7 +17,7 @@ export type Config = {
 
 export const DEFAULT_CONFIG: Config = {
   bridge: {
-    baseUrl: "http://localhost:8000",
+    baseUrl: "https://bridge.hodei.io/api/dev",
   },
   anvil: {
     mainnet: {
