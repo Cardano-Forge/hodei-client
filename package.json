@@ -1,6 +1,6 @@
 {
   "name": "@ada-anvil/hodei-client",
-  "version": "0.0.1-alpha.3",
+  "version": "0.0.1-alpha.4",
   "devDependencies": {
     "@biomejs/biome": "2.4.4",
     "@microsoft/api-extractor": "^7.57.4",
