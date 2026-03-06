@@ -8,7 +8,7 @@ export default defineConfig({
   build: {
     lib: {
       entry: "src/lib.ts",
-      name: "hodei",
+      name: "Hodei",
       fileName: "lib",
     },
   },
@@ -43,6 +43,13 @@ function copyPackageJson(): PluginOption {
               main: "./lib.umd.cjs",
               module: "./lib.js",
               types: "./lib.d.ts",
+              exports: {
+                ".": {
+                  types: "./lib.d.ts",
+                  import: "./lib.js",
+                  require: "./lib.umd.cjs",
+                },
+              },
             },
             null,
             2,
