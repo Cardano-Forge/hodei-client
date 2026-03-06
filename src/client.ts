@@ -27,6 +27,16 @@ export class HodeiClient extends HTMLElement {
       throw new Error("dialog not found");
     }
 
+    for (const event of [
+      "pointerdown",
+      "pointerup",
+      "click",
+      "mousedown",
+      "mouseup",
+    ] as const) {
+      this.addEventListener(event, (e) => e.stopPropagation());
+    }
+
     this._dialog.addEventListener("click", (e) => {
       if (e.target === this._dialog) {
         this._dialog.close("backdrop");

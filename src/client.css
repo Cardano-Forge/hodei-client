@@ -4,6 +4,7 @@
 
 :host {
   font-family: "Roboto", Arial, Helvetica, sans-serif;
+  pointer-events: auto;
 }
 
 dialog {
