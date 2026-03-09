@@ -39,17 +39,25 @@ export type SubmitTxInput = {
   config: Config;
   network: keyof Config["anvil"];
   transaction: string;
+  signature?: string;
 };
 
-type SubmitTxOutput = { txHash: string };
+type SubmitTxOutput = {
+  txHash: string;
+};
 
 export async function submitTx(input: SubmitTxInput): Promise<SubmitTxOutput> {
   const { baseUrl, apiKey } = input.config.anvil[input.network];
-  const url = new URL(`${baseUrl}/transactions/submit`);
-  url.searchParams.set("transaction", input.transaction);
-  const res = await fetch(url, {
+  const res = await fetch(`${baseUrl}/transactions/submit`, {
     method: "POST",
-    headers: { "x-api-key": apiKey },
+    headers: {
+      "x-api-key": apiKey,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      transaction: input.transaction,
+      signatures: input.signature ? [input.signature] : [],
+    }),
   });
   return res.json() as Promise<SubmitTxOutput>;
 }

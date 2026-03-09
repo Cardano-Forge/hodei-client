@@ -1,3 +1,4 @@
+import { submitTx } from "./anvil";
 import type { EnabledWalletApi } from "./api";
 import { DEFAULT_CONFIG } from "./config";
 import { initialize } from "./lib";
@@ -44,13 +45,19 @@ document.querySelector("#sign-tx")?.addEventListener("click", async () => {
     const { baseUrl, apiKey } = DEFAULT_CONFIG.anvil[network];
     const url = new URL(`${baseUrl}/transactions/build`);
     const changeAddress = await wallet.getChangeAddress();
+    const utxos = await wallet.getUtxos();
+    console.log("utxos", utxos);
     const buildRes = await fetch(url, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ changeAddress }),
+      body: JSON.stringify({
+        changeAddress,
+        utxos,
+        txChaining: false,
+      }),
     });
 
     if (!buildRes.ok) {
@@ -68,6 +75,16 @@ document.querySelector("#sign-tx")?.addEventListener("click", async () => {
 
     const signRes = await wallet.signTx(parsed.complete);
     console.log("signed tx", signRes);
+
+    if (confirm("submit?")) {
+      const submitRes = await submitTx({
+        config: DEFAULT_CONFIG,
+        network: (await wallet.getNetworkId()) === 1 ? "mainnet" : "preprod",
+        transaction: parsed.complete,
+        signature: signRes,
+      });
+      console.log("submitRes", submitRes);
+    }
   } catch (error) {
     console.error(error);
   }
