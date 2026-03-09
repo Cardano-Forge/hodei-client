@@ -42,7 +42,6 @@ npm install @ada-anvil/weld-plugin-hodei @ada-anvil/weld
 ### Usage (Vanilla JS)
 
 ```ts
-```ts
 import { weld } from "@ada-anvil/weld";
 import { builtinPlugins } from "@ada-anvil/weld/plugins";
 import { hodeiPlugin } from "@ada-anvil/weld-plugin-hodei";
