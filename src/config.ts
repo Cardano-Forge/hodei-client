@@ -13,6 +13,11 @@ export type Config = {
   waitForPairing: boolean;
   onError(data: { error?: string }): void;
   onClose(data: { code: number; reason: string }): void;
+  onWalletUpdate?(wallet: {
+    baseAddress: string;
+    stakeAddress: string;
+    network: "mainnet" | "preprod";
+  }): void;
 };
 
 export const DEFAULT_CONFIG: Config = {

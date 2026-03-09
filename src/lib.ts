@@ -63,6 +63,14 @@ function createInitialWalletApi(
       state.config.onClose(bridgeState);
     }
 
+    if (bridgeState.status === "paired") {
+      state.config.onWalletUpdate?.({
+        baseAddress: bridgeState.baseAddress,
+        stakeAddress: bridgeState.stakeAddress,
+        network: bridgeState.network,
+      });
+    }
+
     if (state.resolved) {
       state.resolved?.client.sendCommand({
         sender: "wallet",

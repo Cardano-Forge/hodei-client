@@ -7,6 +7,7 @@ initialize({
   debug: true,
   onError: ({ error }) => console.log("socket error:", error ?? "unknown"),
   onClose: ({ code, reason }) => console.log("socket closed:", code, reason),
+  onWalletUpdate: (wallet) => console.log("wallet update", wallet),
 });
 
 let wallet: EnabledWalletApi | undefined;
