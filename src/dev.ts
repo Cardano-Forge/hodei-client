@@ -117,15 +117,17 @@ document.querySelector("#delegate")?.addEventListener("click", async () => {
         delegations: [
           {
             type: "pool",
+            // Anvil pool
             keyHash: "9c6120440ce518cc375de37536e1c0f0e28beedd4e11a7a053fb923b",
             address: changeAddress,
           },
-          {
-            type: "pool",
-            keyHash: "9c6120440ce518cc375de37536e1c0f0e28beedd4e11a7a053fb923b",
-            address:
-              "addr_test1qp57m0ws6zjl6l07pl8dqa3s6q7zl857tsxdypc4zem5edskgv552vsywzgqyukhupc8qckzr4g2wqsmxl0tsssn4wrqg3fe87",
-          },
+          // Uncomment to trigger proof generation error
+          // {
+          //   type: "pool",
+          //   keyHash: "9c6120440ce518cc375de37536e1c0f0e28beedd4e11a7a053fb923b",
+          //   address:
+          //     "addr_test1qp57m0ws6zjl6l07pl8dqa3s6q7zl857tsxdypc4zem5edskgv552vsywzgqyukhupc8qckzr4g2wqsmxl0tsssn4wrqg3fe87",
+          // },
         ],
       }),
     });
