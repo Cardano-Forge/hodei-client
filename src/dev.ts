@@ -91,6 +91,75 @@ document.querySelector("#sign-tx")?.addEventListener("click", async () => {
   }
 });
 
+document.querySelector("#delegate")?.addEventListener("click", async () => {
+  try {
+    if (!wallet) {
+      throw new Error("wallet not connected");
+    }
+
+    const networkId = await wallet.getNetworkId();
+    const network = networkId === 1 ? "mainnet" : "preprod";
+
+    const { baseUrl, apiKey } = DEFAULT_CONFIG.anvil[network];
+    const url = new URL(`${baseUrl}/transactions/build`);
+    const changeAddress = await wallet.getChangeAddress();
+    const utxos = await wallet.getUtxos();
+    const buildRes = await fetch(url, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        changeAddress,
+        utxos,
+        txChaining: false,
+        delegations: [
+          {
+            type: "pool",
+            keyHash: "9c6120440ce518cc375de37536e1c0f0e28beedd4e11a7a053fb923b",
+            address: changeAddress,
+          },
+          {
+            type: "pool",
+            keyHash: "9c6120440ce518cc375de37536e1c0f0e28beedd4e11a7a053fb923b",
+            address:
+              "addr_test1qp57m0ws6zjl6l07pl8dqa3s6q7zl857tsxdypc4zem5edskgv552vsywzgqyukhupc8qckzr4g2wqsmxl0tsssn4wrqg3fe87",
+          },
+        ],
+      }),
+    });
+
+    if (!buildRes.ok) {
+      throw new Error(
+        `build failed: ${buildRes.status} ${buildRes.statusText}`,
+      );
+    }
+
+    const parsed = (await buildRes.json()) as {
+      hash: string;
+      complete: string;
+    };
+    console.log("tx", parsed.complete);
+    console.log("tx hash", parsed.hash);
+
+    const signRes = await wallet.signTx(parsed.complete, true);
+    console.log("signed tx", signRes);
+
+    if (confirm("submit?")) {
+      const submitRes = await submitTx({
+        config: DEFAULT_CONFIG,
+        network: (await wallet.getNetworkId()) === 1 ? "mainnet" : "preprod",
+        transaction: parsed.complete,
+        signature: signRes,
+      });
+      console.log("submitRes", submitRes);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+});
+
 function utf8ToHex(input: string) {
   const encoder = new TextEncoder();
   const encoded = encoder.encode(input);
