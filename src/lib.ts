@@ -11,7 +11,12 @@ import {
 } from "./bridge";
 import { addCommandListener, type Command, sendCommand } from "./command";
 import { type Config, DEFAULT_CONFIG } from "./config";
-import { createApiError, createTxSendError } from "./error";
+import {
+  createApiError,
+  createTxSendError,
+  createTxSignError,
+  type TxSignErrorCode,
+} from "./error";
 import { getToken } from "./storage";
 import { deferredPromise, getFailureReason } from "./utils";
 
@@ -232,7 +237,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
           if (message.type === "client.sig_req_accepted") {
             deferred.resolve(message.payload.signature);
           } else {
-            deferred.reject(`Rejected by user: ${message.payload.reason}`);
+            deferred.reject(message.payload.reason);
           }
 
           controller.abort();
@@ -299,11 +304,19 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       return [bridgeState.stakeAddress];
     },
     signTx: async (tx, partialSign = false) => {
-      return handleSigReq({
-        requestId: crypto.randomUUID(),
-        tx,
-        partialSign,
-      });
+      try {
+        return await handleSigReq({
+          requestId: crypto.randomUUID(),
+          tx,
+          partialSign,
+        });
+      } catch (error) {
+        const reason = getFailureReason(error);
+        const code: TxSignErrorCode = reason?.startsWith("ProofGeneration")
+          ? "proofGeneration"
+          : "userDeclined";
+        throw createTxSignError(code, reason);
+      }
     },
     signData: async (address, data) => {
       const res = await handleSigReq({

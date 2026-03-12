@@ -31,3 +31,30 @@ export function createApiError(
     info: getFailureReason(cause) ?? "unknown",
   };
 }
+
+export const TX_SIGN_ERROR_CODES = {
+  proofGeneration: 1,
+  userDeclined: 2,
+};
+
+export type TxSignErrorCode = keyof typeof TX_SIGN_ERROR_CODES;
+
+export function createTxSignError(code: TxSignErrorCode, cause?: unknown) {
+  let info = getFailureReason(cause) ?? "unknown";
+  for (const prefix of ["ProofGeneration: ", "UserDeclined: "]) {
+    if (info.startsWith(prefix)) {
+      info = info.slice(prefix.length);
+      break;
+    }
+  }
+  if (info === "UserDeclined") {
+    info = "User declined";
+  }
+  if (info === "ProofGeneration") {
+    info = "Unable to sign the transaction";
+  }
+  return {
+    code: TX_SIGN_ERROR_CODES[code],
+    info,
+  };
+}
