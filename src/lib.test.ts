@@ -237,10 +237,13 @@ describe("signTx", () => {
 
     ws.simulateMessage({
       type: "client.sig_req_rejected",
-      payload: { requestId: "req-456", reason: "user declined" },
+      payload: { requestId: "req-456", reason: "UserDeclined" },
     });
 
-    await expect(signPromise).rejects.toContain("user declined");
+    await expect(signPromise).rejects.toStrictEqual({
+      code: 2,
+      info: "User declined",
+    });
   });
 
   it("ignores non-matching requestId", async () => {
