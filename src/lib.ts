@@ -33,7 +33,7 @@ export function initialize(
     window.cardano = {};
   }
 
-  if (!window.cardano.hodei) {
+  if (!("hodei" in window.cardano)) {
     window.cardano.hodei = createInitialWalletApi(config);
   }
 
