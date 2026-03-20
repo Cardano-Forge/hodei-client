@@ -1,5 +1,5 @@
 import { getBalance, getUtxos, submitTx } from "./anvil";
-import type { EnabledWalletApi, InitialWalletApi } from "./api";
+import type { DataSignature, EnabledWalletApi, InitialWalletApi } from "./api";
 import {
   assertIncomingMessage,
   assertSigReqResponse,
@@ -20,7 +20,7 @@ import {
 import { getToken } from "./storage";
 import { deferredPromise, getFailureReason } from "./utils";
 
-export type { Config };
+export type { Config, EnabledWalletApi, InitialWalletApi, DataSignature };
 
 export function initialize(
   config?: Partial<Config>,
@@ -46,7 +46,7 @@ type State = {
   resolved?: EnableOutput;
 };
 
-function createInitialWalletApi(
+export function createInitialWalletApi(
   initialConfig: Partial<Config> = {},
 ): InitialWalletApi {
   const state: State = {
