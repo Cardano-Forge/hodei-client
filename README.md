@@ -29,6 +29,18 @@ const wallet = await window.cardano.hodei.enable();
 const utxos = await wallet.getUtxos();
 ```
 
+## Non-Browser Usage
+
+Use `createInitialWalletApi` to instantiate the wallet API outside of a browser context:
+
+```ts
+import { createInitialWalletApi } from "@ada-anvil/hodei-client";
+
+const walletApi = createInitialWalletApi(config); // Takes the same config object as `initialize`
+
+const wallet = await walletApi.enable();
+const utxos = await wallet.getUtxos();
+```
 
 ## Weld integration
 
