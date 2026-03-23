@@ -9,8 +9,8 @@ import {
 } from "vitest";
 import type { ConnectionState } from "./bridge";
 import type { Config } from "./config";
-import * as storage from "./storage";
 import {
+  createMockTokenStorage,
   latestWS,
   MockWebSocket,
   pairedPayload,
@@ -90,11 +90,17 @@ async function enableWallet(
 }
 
 async function enablePairedWallet(config?: Partial<Config>) {
-  return enableWallet(pairedPayload, config);
+  return enableWallet(pairedPayload, {
+    createTokenStorage: createMockTokenStorage,
+    ...config,
+  });
 }
 
 async function enablePairingWallet(config?: Partial<Config>) {
-  return enableWallet(pairingPayload, config);
+  return enableWallet(pairingPayload, {
+    createTokenStorage: createMockTokenStorage,
+    ...config,
+  });
 }
 
 describe("wallet API (paired)", () => {
@@ -326,25 +332,32 @@ describe("isEnabled", () => {
 
   it("returns false when no token and not connected", async () => {
     const { initialize } = await import("./lib");
-    const initial = initialize();
+    const initial = initialize({
+      createTokenStorage: () =>
+        createMockTokenStorage({ getToken: async () => undefined }),
+    });
     assert(initial);
     expect(await initial.isEnabled()).toBe(false);
   });
 
   it("delegates to checkToken when token exists but not yet enabled", async () => {
-    vi.spyOn(storage, "getToken").mockReturnValue("some-token");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 200 }));
     const { initialize } = await import("./lib");
-    const initial = initialize();
+    const initial = initialize({
+      createTokenStorage: () =>
+        createMockTokenStorage({ getToken: async () => "some-token" }),
+    });
     assert(initial);
     expect(await initial.isEnabled()).toBe(true);
   });
 
   it("returns false when checkToken returns invalid", async () => {
-    vi.spyOn(storage, "getToken").mockReturnValue("bad-token");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 404 }));
     const { initialize } = await import("./lib");
-    const initial = initialize();
+    const initial = initialize({
+      createTokenStorage: () =>
+        createMockTokenStorage({ getToken: async () => "bad-token" }),
+    });
     assert(initial);
     expect(await initial.isEnabled()).toBe(false);
   });

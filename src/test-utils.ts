@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 import type { ConnectionState } from "./bridge";
-import * as storage from "./storage";
+import type { ITokenStorage } from "./storage";
 
 type WSListener = (event: unknown) => void;
 
@@ -70,6 +70,18 @@ export function latestWS(): MockWebSocket {
   return MockWebSocket.instances[MockWebSocket.instances.length - 1];
 }
 
+export function createMockTokenStorage(
+  overrides?: Partial<ITokenStorage>,
+): ITokenStorage {
+  return {
+    getToken: vi.fn().mockReturnValue(undefined),
+    setToken: vi.fn(),
+    deleteToken: vi.fn(),
+    destroy: vi.fn(),
+    ...overrides,
+  };
+}
+
 export const pairedPayload = {
   status: "paired" as const,
   sessionId: "sess-1",
@@ -89,7 +101,4 @@ export const pairingPayload = {
 export function setupMocks() {
   MockWebSocket.instances = [];
   vi.stubGlobal("WebSocket", MockWebSocket);
-  vi.spyOn(storage, "getToken").mockReturnValue(undefined);
-  vi.spyOn(storage, "setToken").mockImplementation(() => {});
-  vi.spyOn(storage, "deleteToken").mockImplementation(() => {});
 }

@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   assertSigReqResponse,
   Bridge,
+  type BridgeState,
   checkToken,
   isBridgeState,
 } from "./bridge";
 import { DEFAULT_CONFIG } from "./config";
-import * as storage from "./storage";
+import type { ITokenStorage } from "./storage";
 import {
+  createMockTokenStorage,
   latestWS,
   MockWebSocket,
   pairedPayload,
@@ -15,9 +17,21 @@ import {
   setupMocks,
 } from "./test-utils";
 
-function makeBridge(onStateChange = vi.fn()) {
+function makeBridge({
+  onStateChange = vi.fn(),
+  storage: storageOverrides,
+}: {
+  onStateChange?: (state: BridgeState) => void;
+  storage?: Partial<ITokenStorage>;
+} = {}) {
+  const storage = createMockTokenStorage(storageOverrides);
   return {
-    bridge: new Bridge({ config: DEFAULT_CONFIG, onStateChange }),
+    storage,
+    bridge: new Bridge({
+      config: DEFAULT_CONFIG,
+      storage,
+      onStateChange,
+    }),
     onStateChange,
   };
 }
@@ -29,7 +43,7 @@ async function waitForWS() {
 }
 
 async function connectPaired(onStateChange = vi.fn()) {
-  const { bridge } = makeBridge(onStateChange);
+  const { bridge, storage } = makeBridge({ onStateChange });
   const p = bridge.connect();
   await waitForWS();
   const ws = latestWS();
@@ -39,7 +53,7 @@ async function connectPaired(onStateChange = vi.fn()) {
   });
   await p;
   onStateChange.mockClear();
-  return { bridge, onStateChange, ws };
+  return { bridge, storage, onStateChange, ws };
 }
 
 beforeEach(() => {
@@ -104,9 +118,9 @@ describe("Bridge.connect", () => {
   });
 
   it("appends token param when stored token is valid", async () => {
-    vi.spyOn(storage, "getToken").mockReturnValue("stored-tok");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 200 }));
-    const { bridge } = makeBridge();
+    const token = "stored-tok";
+    const { bridge } = makeBridge({ storage: { getToken: async () => token } });
     const p = bridge.connect();
     await waitForWS();
     latestWS().simulateMessage({
@@ -114,20 +128,21 @@ describe("Bridge.connect", () => {
       payload: pairingPayload,
     });
     await p;
-    expect(latestWS().url).toContain("token=stored-tok");
+    expect(latestWS().url).toContain(`token=${token}`);
   });
 
   it("throws when stored token returns 409 (already connected)", async () => {
-    vi.spyOn(storage, "getToken").mockReturnValue("tok");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 409 }));
-    const { bridge } = makeBridge();
+    const { bridge } = makeBridge({ storage: { getToken: async () => "tok" } });
     await expect(bridge.connect()).rejects.toThrow("Already connected");
   });
 
   it("deletes token and connects without param when token returns 404", async () => {
-    vi.spyOn(storage, "getToken").mockReturnValue("old-tok");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 404 }));
-    const { bridge } = makeBridge();
+    const token = "old-tok";
+    const { bridge, storage } = makeBridge({
+      storage: { getToken: async () => token },
+    });
     const p = bridge.connect();
     await waitForWS();
     latestWS().simulateMessage({
@@ -140,7 +155,7 @@ describe("Bridge.connect", () => {
   });
 
   it("resolves with pairing state and calls onStateChange", async () => {
-    const { bridge, onStateChange } = makeBridge();
+    const { bridge, storage, onStateChange } = makeBridge();
     const p = bridge.connect();
     await waitForWS();
     latestWS().simulateMessage({
@@ -217,7 +232,7 @@ describe("disconnection", () => {
   });
 
   it("close event code 4001 deletes stored token", async () => {
-    const { ws } = await connectPaired();
+    const { ws, storage } = await connectPaired();
     ws.simulateClose(4001);
     expect(storage.deleteToken).toHaveBeenCalled();
   });
@@ -242,7 +257,11 @@ describe("reconnection", () => {
 
   async function connectWithFakeTimers() {
     const onStateChange = vi.fn();
-    const bridge = new Bridge({ config: DEFAULT_CONFIG, onStateChange });
+    const bridge = new Bridge({
+      config: DEFAULT_CONFIG,
+      onStateChange,
+      storage: createMockTokenStorage(),
+    });
     const p = bridge.connect();
     await vi.advanceTimersByTimeAsync(0);
     latestWS().simulateMessage({

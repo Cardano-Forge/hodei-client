@@ -1,3 +1,5 @@
+import { DefaultTokenStorage, type ITokenStorage } from "./storage";
+
 export type Config = {
   bridge: {
     baseUrl: string;
@@ -18,6 +20,7 @@ export type Config = {
     stakeAddress: string;
     network: "mainnet" | "preprod";
   }): void;
+  createTokenStorage(): ITokenStorage;
 };
 
 export const DEFAULT_CONFIG: Config = {
@@ -40,4 +43,5 @@ export const DEFAULT_CONFIG: Config = {
     console.error("[HODEI] unhandled error:", error ?? "unknown"),
   onClose: ({ code, reason }) =>
     console.error("[HODEI] unhandled closure:", code, reason),
+  createTokenStorage: () => new DefaultTokenStorage(),
 };

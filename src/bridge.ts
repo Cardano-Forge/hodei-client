@@ -1,9 +1,10 @@
 import type { Config } from "./config";
-import { deleteToken, getToken, setToken } from "./storage";
+import type { ITokenStorage } from "./storage";
 import { deferredPromise, getFailureReason } from "./utils";
 
 export type BridgeOpts = {
   config: Config;
+  storage: ITokenStorage;
   onStateChange(state: BridgeState): void;
 };
 
@@ -16,6 +17,7 @@ export type BridgeConnection = {
 
 export class Bridge {
   private readonly _config: Config;
+  private readonly _storage: ITokenStorage;
   private readonly _onStateChange: (state: BridgeState) => void;
   private _debug: boolean;
 
@@ -24,6 +26,7 @@ export class Bridge {
 
   constructor(opts: BridgeOpts) {
     this._config = opts.config;
+    this._storage = opts.storage;
     this._onStateChange = opts.onStateChange;
     this._debug = opts.config?.debug ?? false;
   }
@@ -139,7 +142,7 @@ export class Bridge {
 
       this.debugLog("connected");
 
-      setToken(state.token);
+      this._storage.setToken(state.token);
 
       const connection: BridgeConnection = {
         id: connectionId,
@@ -219,7 +222,7 @@ export class Bridge {
           // Session deleted
           if (event.code === 4001) {
             this.debugLog("session deleted");
-            deleteToken();
+            this._storage.deleteToken();
           }
 
           if (event.code !== 1000 && this._scheduleReconnect()) {
@@ -283,7 +286,7 @@ export class Bridge {
   }
 
   private async _getToken(): Promise<string | undefined> {
-    const token = getToken();
+    const token = await this._storage.getToken();
     if (!token) {
       return undefined;
     }
@@ -303,7 +306,7 @@ export class Bridge {
     }
 
     if (checked.reason === "notFound") {
-      deleteToken();
+      this._storage.deleteToken();
     }
 
     return undefined;

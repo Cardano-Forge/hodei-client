@@ -17,7 +17,7 @@ import {
   createTxSignError,
   type TxSignErrorCode,
 } from "./error";
-import { getToken } from "./storage";
+import type { ITokenStorage } from "./storage";
 import { deferredPromise, getFailureReason } from "./utils";
 
 export type { Config, EnabledWalletApi, InitialWalletApi, DataSignature };
@@ -44,16 +44,20 @@ type State = {
   config: Config;
   promise?: Promise<EnableOutput>;
   resolved?: EnableOutput;
+  storage: ITokenStorage;
 };
 
 export function createInitialWalletApi(
   initialConfig: Partial<Config> = {},
 ): InitialWalletApi {
+  const config: Config = {
+    ...DEFAULT_CONFIG,
+    ...initialConfig,
+  };
+
   const state: State = {
-    config: {
-      ...DEFAULT_CONFIG,
-      ...initialConfig,
-    },
+    config,
+    storage: config.createTokenStorage(),
   };
 
   const handleStateChange = async (bridgeState: BridgeState) => {
@@ -100,6 +104,7 @@ export function createInitialWalletApi(
         state.promise = enable({
           config: state.config,
           onStateChange: handleStateChange,
+          storage: state.storage,
         });
       }
 
@@ -134,7 +139,7 @@ export function createInitialWalletApi(
         return state.resolved.bridge.isConnected();
       }
 
-      const token = getToken();
+      const token = await state.storage.getToken();
       if (!token) {
         return false;
       }
