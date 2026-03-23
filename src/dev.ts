@@ -1,14 +1,21 @@
 import { submitTx } from "./anvil";
 import type { EnabledWalletApi } from "./api";
-import { DEFAULT_CONFIG } from "./config";
+import { type Config, DEFAULT_CONFIG } from "./config";
 import { initialize } from "./lib";
 
-initialize({
+const devConfig: Config = {
+  ...DEFAULT_CONFIG,
+  bridge: {
+    ...DEFAULT_CONFIG.bridge,
+    baseUrl: "http://localhost:8000",
+  },
   debug: true,
   onError: ({ error }) => console.log("socket error:", error ?? "unknown"),
   onClose: ({ code, reason }) => console.log("socket closed:", code, reason),
   onWalletUpdate: (wallet) => console.log("wallet update", wallet),
-});
+};
+
+initialize(devConfig);
 
 let wallet: EnabledWalletApi | undefined;
 
@@ -43,7 +50,7 @@ document.querySelector("#sign-tx")?.addEventListener("click", async () => {
     const networkId = await wallet.getNetworkId();
     const network = networkId === 1 ? "mainnet" : "preprod";
 
-    const { baseUrl, apiKey } = DEFAULT_CONFIG.anvil[network];
+    const { baseUrl, apiKey } = devConfig.anvil[network];
     const url = new URL(`${baseUrl}/transactions/build`);
     const changeAddress = await wallet.getChangeAddress();
     const utxos = await wallet.getUtxos();
@@ -79,7 +86,7 @@ document.querySelector("#sign-tx")?.addEventListener("click", async () => {
 
     if (confirm("submit?")) {
       const submitRes = await submitTx({
-        config: DEFAULT_CONFIG,
+        config: devConfig,
         network: (await wallet.getNetworkId()) === 1 ? "mainnet" : "preprod",
         transaction: parsed.complete,
         signature: signRes,
@@ -100,7 +107,7 @@ document.querySelector("#delegate")?.addEventListener("click", async () => {
     const networkId = await wallet.getNetworkId();
     const network = networkId === 1 ? "mainnet" : "preprod";
 
-    const { baseUrl, apiKey } = DEFAULT_CONFIG.anvil[network];
+    const { baseUrl, apiKey } = devConfig.anvil[network];
     const url = new URL(`${baseUrl}/transactions/build`);
     const changeAddress = await wallet.getChangeAddress();
     const utxos = await wallet.getUtxos();
@@ -150,7 +157,7 @@ document.querySelector("#delegate")?.addEventListener("click", async () => {
 
     if (confirm("submit?")) {
       const submitRes = await submitTx({
-        config: DEFAULT_CONFIG,
+        config: devConfig,
         network: (await wallet.getNetworkId()) === 1 ? "mainnet" : "preprod",
         transaction: parsed.complete,
         signature: signRes,
