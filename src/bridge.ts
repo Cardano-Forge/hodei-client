@@ -298,8 +298,8 @@ export class Bridge {
       return token;
     }
 
-    if (checked.reason === "alreadyConnected") {
-      throw new Error("Already connected");
+    if (checked.reason === "tooManyConnections") {
+      throw new Error("Too many connections");
     }
 
     if (checked.reason === "notFound") {
@@ -312,7 +312,7 @@ export class Bridge {
 
 type CheckedToken =
   | { valid: true; token: string }
-  | { valid: false; reason: "notFound" | "alreadyConnected" };
+  | { valid: false; reason: "notFound" | "tooManyConnections" };
 
 export type CheckTokenInput = {
   config: Config;
@@ -334,7 +334,7 @@ export async function checkToken(
   }
 
   if (res.status === 409) {
-    return { valid: false, reason: "alreadyConnected" };
+    return { valid: false, reason: "tooManyConnections" };
   }
 
   return { valid: true, token: input.token };

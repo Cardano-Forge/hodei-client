@@ -63,10 +63,10 @@ describe("checkToken", () => {
     expect(result).toEqual({ valid: false, reason: "notFound" });
   });
 
-  it("returns alreadyConnected on 409", async () => {
+  it("returns tooManyConnections on 409", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 409 }));
     const result = await checkToken({ config: DEFAULT_CONFIG, token: "tok" });
-    expect(result).toEqual({ valid: false, reason: "alreadyConnected" });
+    expect(result).toEqual({ valid: false, reason: "tooManyConnections" });
   });
 
   it("sends correct Authorization header", async () => {
@@ -117,11 +117,11 @@ describe("Bridge.connect", () => {
     expect(latestWS().url).toContain("token=stored-tok");
   });
 
-  it("throws when stored token returns 409 (already connected)", async () => {
+  it("throws when stored token returns 409 (too many connections)", async () => {
     vi.spyOn(storage, "getToken").mockReturnValue("tok");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 409 }));
     const { bridge } = makeBridge();
-    await expect(bridge.connect()).rejects.toThrow("Already connected");
+    await expect(bridge.connect()).rejects.toThrow("Too many connections");
   });
 
   it("deletes token and connects without param when token returns 404", async () => {
