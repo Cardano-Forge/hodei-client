@@ -1,48 +1,6 @@
 # Hodei Client
 
-## Installation
-
-```bash
-npm install @ada-anvil/hodei-client
-```
-
-## Usage
-
-```ts
-import { initialize } from "@ada-anvil/hodei-client";
-
-// Initialize the client
-
-const config = {
-  debug: true,
-  onError: ({ error }) => console.log("socket error:", error ?? "unknown"),
-  onClose: ({ code, reason }) => console.log("socket closed:", code, reason),
-  onWalletUpdate: (wallet) => console.log("wallet update", wallet),
-};
-
-initialize(config);
-
-// CIP-30 API is now available in window.cardano.hodei
-
-const wallet = await window.cardano.hodei.enable();
-
-const utxos = await wallet.getUtxos();
-```
-
-## Non-Browser Usage
-
-Use `createInitialWalletApi` to instantiate the wallet API outside of a browser context:
-
-```ts
-import { createInitialWalletApi } from "@ada-anvil/hodei-client";
-
-const walletApi = createInitialWalletApi(config); // Takes the same config object as `initialize`
-
-const wallet = await walletApi.enable();
-const utxos = await wallet.getUtxos();
-```
-
-## Weld integration
+## Usage with Weld
 
 Hodei client seemlessly integrates with [Weld](https://github.com/Cardano-Forge/weld)'s plugin system.
 
@@ -80,4 +38,48 @@ export const App = ({ children }) => {
     </WeldProvider>
   );
 };
+```
+
+## Usage without Weld
+
+### Installation
+
+```bash
+npm install @ada-anvil/hodei-client
+```
+
+### Usage
+
+```ts
+import { initialize } from "@ada-anvil/hodei-client";
+
+// Initialize the client
+
+const config = {
+  debug: true,
+  onError: ({ error }) => console.log("socket error:", error ?? "unknown"),
+  onClose: ({ code, reason }) => console.log("socket closed:", code, reason),
+  onWalletUpdate: (wallet) => console.log("wallet update", wallet),
+};
+
+initialize(config);
+
+// CIP-30 API is now available in window.cardano.hodei
+
+const wallet = await window.cardano.hodei.enable();
+
+const utxos = await wallet.getUtxos();
+```
+
+### Non-Browser Usage
+
+Use `createInitialWalletApi` to instantiate the wallet API outside of a browser context:
+
+```ts
+import { createInitialWalletApi } from "@ada-anvil/hodei-client";
+
+const walletApi = createInitialWalletApi(config); // Takes the same config object as `initialize`
+
+const wallet = await walletApi.enable();
+const utxos = await wallet.getUtxos();
 ```
