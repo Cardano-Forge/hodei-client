@@ -1,6 +1,6 @@
 # Hodei Client
 
-Builds CIP-30 compliant JavaScript objects that can be injected in window.cardano to make integration of [Hodei wallet](https://hodei.io/) seemless in web dApps.
+Builds CIP-30 compliant JavaScript objects that can be injected in window.cardano to make integration of [Hodei wallet](https://hodei.io/) in web dApps seemless.
 
 ## Usage with Weld
 
