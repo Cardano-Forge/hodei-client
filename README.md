@@ -1,5 +1,7 @@
 # Hodei Client
 
+Injects a CIP-30 compliant object in window.cardano.hodei to make integration of [Hodei wallet](https://hodei.io/) seemless in web dApps.
+
 ## Usage with Weld
 
 Hodei client seemlessly integrates with [Weld](https://github.com/Cardano-Forge/weld)'s plugin system.
