@@ -216,23 +216,28 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
     }
 
     const controller = new AbortController();
+
     bridge.connection.controller.signal.addEventListener(
       "abort",
       () => controller.abort(),
-      {
-        signal: controller.signal,
-      },
+      { signal: controller.signal },
     );
 
     const deferred = deferredPromise<string>();
 
-    bridge.connection.ws.addEventListener(
+    controller.signal.addEventListener("abort", () => {
+      deferred.reject("aborted");
+    });
+
+    bridge.connection.events.addEventListener(
       "message",
       (event) => {
+        if (!(event instanceof CustomEvent)) {
+          return;
+        }
         try {
-          const json = JSON.parse(event.data);
-          assertSigReqResponse(json);
-          const message = json;
+          const message = event.detail;
+          assertSigReqResponse(message);
           if (message.payload.requestId !== payload.requestId) {
             return;
           }
@@ -246,7 +251,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
           controller.abort();
         } catch (error) {
           bridge.debugLog(
-            `error parsing message ${event.data}: ${getFailureReason(error)}`,
+            `error parsing message ${event.detail}: ${getFailureReason(error)}`,
           );
         }
       },

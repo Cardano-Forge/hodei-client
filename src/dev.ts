@@ -29,6 +29,11 @@ window.onkeydown = (event) => {
     event.stopPropagation();
     simulateDisconnection();
   }
+  if (event.key === "S") {
+    event.preventDefault();
+    event.stopPropagation();
+    signDataStake();
+  }
 };
 
 function simulateDisconnection() {
@@ -193,25 +198,27 @@ function utf8ToHex(input: string) {
   );
 }
 
+async function signDataStake() {
+  try {
+    if (!wallet) {
+      throw new Error("wallet not connected");
+    }
+    const data = utf8ToHex("hello world!");
+    console.log("data", data);
+    const [rewardAddress] = await wallet.getRewardAddresses();
+    if (!rewardAddress) {
+      throw new Error("no reward address");
+    }
+    const signRes = await wallet.signData(rewardAddress, data);
+    console.log("signRes", signRes);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 document
   .querySelector("#sign-data-stake")
-  ?.addEventListener("click", async () => {
-    try {
-      if (!wallet) {
-        throw new Error("wallet not connected");
-      }
-      const data = utf8ToHex("hello world!");
-      console.log("data", data);
-      const [rewardAddress] = await wallet.getRewardAddresses();
-      if (!rewardAddress) {
-        throw new Error("no reward address");
-      }
-      const signRes = await wallet.signData(rewardAddress, data);
-      console.log("signRes", signRes);
-    } catch (error) {
-      console.error(error);
-    }
-  });
+  ?.addEventListener("click", signDataStake);
 
 document
   .querySelector("#sign-data-payment")

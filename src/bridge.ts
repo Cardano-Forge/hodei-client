@@ -12,6 +12,7 @@ export type BridgeConnection = {
   ws: WebSocket;
   state: BridgeState;
   controller: AbortController;
+  events: EventTarget;
 };
 
 export class Bridge {
@@ -88,7 +89,7 @@ export class Bridge {
   }
 
   private async _connect(): Promise<ConnectionState> {
-    this.disconnect();
+    this._connection?.ws.close(1000, "disconnected");
 
     const baseUrl = this._config.bridge.baseUrl.replace("http", "ws");
     const url = new URL(`${baseUrl}/client/ws`);
@@ -145,7 +146,9 @@ export class Bridge {
         id: connectionId,
         ws,
         state: state as BridgeState,
-        controller: new AbortController(),
+        // Keep stable references so that event listeners keep working
+        controller: this._connection?.controller ?? new AbortController(),
+        events: this._connection?.events ?? new EventTarget(),
       };
 
       this._connection = connection;
@@ -166,6 +169,13 @@ export class Bridge {
 
             const json = JSON.parse(event.data);
             assertIncomingMessage(json);
+
+            this._connection?.events.dispatchEvent(
+              new CustomEvent("message", {
+                detail: json,
+              }),
+            );
+
             switch (json.type) {
               case "client.wallet_updated": {
                 this.debugLog("received wallet_updated message");
