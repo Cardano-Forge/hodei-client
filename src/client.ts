@@ -70,6 +70,13 @@ export class HodeiClient extends HTMLElement {
       if (command.sender !== "wallet") {
         return;
       }
+      if (
+        command.type === "state_changed" &&
+        command.payload.status === "paired" &&
+        this._state.status === "disconnecting"
+      ) {
+        return;
+      }
       switch (command.type) {
         case "state_changed":
           switch (command.payload.status) {
