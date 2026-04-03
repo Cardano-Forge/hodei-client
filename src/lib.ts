@@ -11,6 +11,7 @@ import {
 } from "./bridge";
 import { addCommandListener, type Command, sendCommand } from "./command";
 import { type Config, DEFAULT_CONFIG } from "./config";
+import type { DevInitialWalletApi } from "./dev";
 import {
   createApiError,
   createTxSendError,
@@ -87,15 +88,10 @@ export function createInitialWalletApi(
     }
   };
 
-  return {
+  const initialApi: DevInitialWalletApi = {
     name: "hodei",
     icon: "https://raw.githubusercontent.com/cardano-forge/weld/main/images/wallets/hodei.png",
     apiVersion: "1",
-    __dev__: {
-      closeWs: () => state.resolved?.bridge.connection?.ws?.close(),
-      unlink: () => state.resolved?.bridge.unlink(),
-      disconnect: () => state.resolved?.bridge.disconnect(),
-    },
     async enable() {
       if (state.resolved?.bridge.isConnected()) {
         return state.resolved.api;
@@ -152,6 +148,16 @@ export function createInitialWalletApi(
       }
     },
   };
+
+  if (import.meta.env.MODE === "development") {
+    initialApi.dev = {
+      closeWs: () => state.resolved?.bridge.connection?.ws?.close(),
+      unlink: () => state.resolved?.bridge.unlink(),
+      disconnect: () => state.resolved?.bridge.disconnect(),
+    };
+  }
+
+  return initialApi;
 }
 
 type EnableOutput = {

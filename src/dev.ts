@@ -1,5 +1,5 @@
 import { submitTx } from "./anvil";
-import type { EnabledWalletApi } from "./api";
+import type { EnabledWalletApi, InitialWalletApi } from "./api";
 import { type Config, DEFAULT_CONFIG } from "./config";
 import { initialize } from "./lib";
 
@@ -66,7 +66,7 @@ document.querySelector("#disconnect")?.addEventListener("click", disconnect);
 
 // Functions
 function loseConnection() {
-  window.cardano?.hodei?.__dev__?.closeWs();
+  getDevApi()?.closeWs();
 }
 
 async function connect() {
@@ -80,11 +80,11 @@ async function connect() {
 }
 
 async function disconnect() {
-  window.cardano?.hodei?.__dev__?.disconnect();
+  getDevApi()?.disconnect();
 }
 
 async function unlink() {
-  window.cardano?.hodei?.__dev__?.unlink();
+  getDevApi()?.unlink();
 }
 
 async function signDataStake() {
@@ -254,4 +254,16 @@ async function delegate() {
   } catch (error) {
     console.error(error);
   }
+}
+
+export type DevInitialWalletApi = InitialWalletApi & {
+  dev?: {
+    closeWs(): void;
+    unlink(): void;
+    disconnect(): void;
+  };
+};
+
+function getDevApi(): DevInitialWalletApi["dev"] {
+  return (window.cardano?.hodei as DevInitialWalletApi)?.dev;
 }
