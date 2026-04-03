@@ -92,7 +92,9 @@ export function createInitialWalletApi(
     icon: "https://raw.githubusercontent.com/cardano-forge/weld/main/images/wallets/hodei.png",
     apiVersion: "1",
     __dev__: {
-      disconnect: () => state.resolved?.bridge.connection?.ws?.close(),
+      closeWs: () => state.resolved?.bridge.connection?.ws?.close(),
+      unlink: () => state.resolved?.bridge.unlink(),
+      disconnect: () => state.resolved?.bridge.disconnect(),
     },
     async enable() {
       if (state.resolved?.bridge.isConnected()) {

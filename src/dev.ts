@@ -28,7 +28,7 @@ window.onkeydown = (event) => {
     fn = connect;
   } else if (event.key === "T") {
     fn = signTx;
-  } else if (event.key === "D") {
+  } else if (event.key === "G") {
     fn = delegate;
   } else if (event.key === "S") {
     fn = signDataStake;
@@ -36,8 +36,10 @@ window.onkeydown = (event) => {
     fn = signDataPayment;
   } else if (event.key === "L") {
     fn = loseConnection;
-  } else if (event.key === "X") {
+  } else if (event.key === "D") {
     fn = disconnect;
+  } else if (event.key === "U") {
+    fn = unlink;
   }
 
   if (fn) {
@@ -64,7 +66,7 @@ document.querySelector("#disconnect")?.addEventListener("click", disconnect);
 
 // Functions
 function loseConnection() {
-  window.cardano?.hodei?.__dev__.disconnect();
+  window.cardano?.hodei?.__dev__?.closeWs();
 }
 
 async function connect() {
@@ -78,7 +80,11 @@ async function connect() {
 }
 
 async function disconnect() {
-  wallet?.disconnect?.();
+  window.cardano?.hodei?.__dev__?.disconnect();
+}
+
+async function unlink() {
+  window.cardano?.hodei?.__dev__?.unlink();
 }
 
 async function signDataStake() {
