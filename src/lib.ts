@@ -380,13 +380,16 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       },
     );
 
-    bridge.connection.ws.addEventListener(
+    bridge.connection.events.addEventListener(
       "message",
       (event) => {
+        if (!(event instanceof CustomEvent)) {
+          return;
+        }
         try {
-          const json = JSON.parse(event.data);
-          assertIncomingMessage(json);
-          if (json.type === "client.wallet_updated") {
+          const message = event.detail;
+          assertIncomingMessage(message);
+          if (message.type === "client.wallet_updated") {
             pairingPromise.resolve();
             controller.abort();
           }
