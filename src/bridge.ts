@@ -387,12 +387,20 @@ type WalletUpdatedMessage = {
 
 type SigReqAcceptedMessage = {
   type: "client.sig_req_accepted";
-  payload: { requestId: string; signature: string };
+  payload: {
+    vaultId: string;
+    requestId: string;
+    signature: string;
+  };
 };
 
 type SigReqRejectedMessage = {
   type: "client.sig_req_rejected";
-  payload: { requestId: string; reason: string };
+  payload: {
+    vaultId: string;
+    requestId: string;
+    reason: string;
+  };
 };
 
 export type SigReqResponseMessage =
@@ -400,6 +408,11 @@ export type SigReqResponseMessage =
   | SigReqRejectedMessage;
 
 type IncomingMessage = WalletUpdatedMessage | SigReqResponseMessage;
+
+export type SigReqAckMessage = {
+  type: "client.sig_req_ack";
+  payload: { vaultId: string; requestId: string };
+};
 
 export type SigReqCreatedMessage = {
   type: "client.sig_req_created";
@@ -413,7 +426,10 @@ type SessionUnlinkedMessage = {
   payload: Record<string, never>;
 };
 
-type OutgoingMessage = SigReqCreatedMessage | SessionUnlinkedMessage;
+type OutgoingMessage =
+  | SigReqAckMessage
+  | SigReqCreatedMessage
+  | SessionUnlinkedMessage;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;

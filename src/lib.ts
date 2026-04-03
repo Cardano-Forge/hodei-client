@@ -250,6 +250,14 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
             return;
           }
 
+          bridge.send({
+            type: "client.sig_req_ack",
+            payload: {
+              vaultId: message.payload.vaultId,
+              requestId: message.payload.requestId,
+            },
+          });
+
           if (message.type === "client.sig_req_accepted") {
             deferred.resolve(message.payload.signature);
           } else {
