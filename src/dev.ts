@@ -19,6 +19,22 @@ initialize(devConfig);
 
 let wallet: EnabledWalletApi | undefined;
 
+window.onload = async () => {
+  wallet = await window.cardano?.hodei?.enable();
+};
+
+window.onkeydown = (event) => {
+  if (event.key === "D") {
+    event.preventDefault();
+    event.stopPropagation();
+    simulateDisconnection();
+  }
+};
+
+function simulateDisconnection() {
+  window.cardano?.hodei?.__dev__.disconnect();
+}
+
 document.querySelector("#connect")?.addEventListener("click", async () => {
   wallet = await window.cardano?.hodei?.enable();
 });

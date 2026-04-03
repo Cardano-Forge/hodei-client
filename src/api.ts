@@ -4,6 +4,9 @@ export type InitialWalletApi = {
   apiVersion: string;
   enable(): Promise<EnabledWalletApi>;
   isEnabled(): Promise<boolean>;
+  __dev__: {
+    disconnect(): void;
+  };
 };
 
 export type EnabledWalletApi = {
