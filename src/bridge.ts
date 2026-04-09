@@ -416,9 +416,13 @@ export type SigReqAckMessage = {
 
 export type SigReqCreatedMessage = {
   type: "client.sig_req_created";
-  payload:
-    | { requestId: string; tx: string; partialSign: boolean }
-    | { requestId: string; data: string; address: string };
+  payload: {
+    requestId: string;
+    capabilities: "ack"[];
+  } & (
+    | { tx: string; partialSign: boolean }
+    | { data: string; address: string }
+  );
 };
 
 type SessionUnlinkedMessage = {
@@ -426,7 +430,7 @@ type SessionUnlinkedMessage = {
   payload: Record<string, never>;
 };
 
-type OutgoingMessage =
+export type OutgoingMessage =
   | SigReqAckMessage
   | SigReqCreatedMessage
   | SessionUnlinkedMessage;

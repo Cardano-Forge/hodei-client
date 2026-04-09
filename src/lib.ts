@@ -333,6 +333,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
           requestId: crypto.randomUUID(),
           tx,
           partialSign,
+          capabilities: ["ack"],
         });
       } catch (error) {
         const reason = getFailureReason(error);
@@ -347,6 +348,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
         requestId: crypto.randomUUID(),
         address,
         data,
+        capabilities: ["ack"],
       });
 
       const [signature, key] = res.split("::");
