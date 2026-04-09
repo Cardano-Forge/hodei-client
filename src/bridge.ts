@@ -387,20 +387,12 @@ type WalletUpdatedMessage = {
 
 type SigReqAcceptedMessage = {
   type: "client.sig_req_accepted";
-  payload: {
-    vaultId: string;
-    requestId: string;
-    signature: string;
-  };
+  payload: { requestId: string; signature: string };
 };
 
 type SigReqRejectedMessage = {
   type: "client.sig_req_rejected";
-  payload: {
-    vaultId: string;
-    requestId: string;
-    reason: string;
-  };
+  payload: { requestId: string; reason: string };
 };
 
 export type SigReqResponseMessage =
@@ -411,7 +403,7 @@ type IncomingMessage = WalletUpdatedMessage | SigReqResponseMessage;
 
 export type SigReqAckMessage = {
   type: "client.sig_req_ack";
-  payload: { vaultId: string; requestId: string };
+  payload: { requestId: string };
 };
 
 export type SigReqCreatedMessage = {
