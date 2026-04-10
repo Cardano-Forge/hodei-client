@@ -12,6 +12,7 @@ export type BridgeConnection = {
   ws: WebSocket;
   state: BridgeState;
   controller: AbortController;
+  events: EventTarget;
 };
 
 export class Bridge {
@@ -88,7 +89,7 @@ export class Bridge {
   }
 
   private async _connect(): Promise<ConnectionState> {
-    this.disconnect();
+    this._connection?.ws.close(1000, "disconnected");
 
     const baseUrl = this._config.bridge.baseUrl.replace("http", "ws");
     const url = new URL(`${baseUrl}/client/ws`);
@@ -145,7 +146,9 @@ export class Bridge {
         id: connectionId,
         ws,
         state: state as BridgeState,
-        controller: new AbortController(),
+        // Keep stable references so that event listeners keep working
+        controller: this._connection?.controller ?? new AbortController(),
+        events: this._connection?.events ?? new EventTarget(),
       };
 
       this._connection = connection;
@@ -166,6 +169,13 @@ export class Bridge {
 
             const json = JSON.parse(event.data);
             assertIncomingMessage(json);
+
+            this._connection?.events.dispatchEvent(
+              new CustomEvent("message", {
+                detail: json,
+              }),
+            );
+
             switch (json.type) {
               case "client.wallet_updated": {
                 this.debugLog("received wallet_updated message");
@@ -391,11 +401,20 @@ export type SigReqResponseMessage =
 
 type IncomingMessage = WalletUpdatedMessage | SigReqResponseMessage;
 
+export type SigReqAckMessage = {
+  type: "client.sig_req_ack";
+  payload: { requestId: string };
+};
+
 export type SigReqCreatedMessage = {
   type: "client.sig_req_created";
-  payload:
-    | { requestId: string; tx: string; partialSign: boolean }
-    | { requestId: string; data: string; address: string };
+  payload: {
+    requestId: string;
+    capabilities: "ack"[];
+  } & (
+    | { tx: string; partialSign: boolean }
+    | { data: string; address: string }
+  );
 };
 
 type SessionUnlinkedMessage = {
@@ -403,7 +422,10 @@ type SessionUnlinkedMessage = {
   payload: Record<string, never>;
 };
 
-type OutgoingMessage = SigReqCreatedMessage | SessionUnlinkedMessage;
+export type OutgoingMessage =
+  | SigReqAckMessage
+  | SigReqCreatedMessage
+  | SessionUnlinkedMessage;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;

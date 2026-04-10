@@ -11,6 +11,7 @@ import {
 } from "./bridge";
 import { addCommandListener, type Command, sendCommand } from "./command";
 import { type Config, DEFAULT_CONFIG } from "./config";
+import type { DevInitialWalletApi } from "./dev";
 import {
   createApiError,
   createTxSendError,
@@ -87,7 +88,7 @@ export function createInitialWalletApi(
     }
   };
 
-  return {
+  const initialApi: DevInitialWalletApi = {
     name: "hodei",
     icon: "https://raw.githubusercontent.com/cardano-forge/weld/main/images/wallets/hodei.png",
     apiVersion: "1",
@@ -147,6 +148,16 @@ export function createInitialWalletApi(
       }
     },
   };
+
+  if (import.meta.env.MODE === "development") {
+    initialApi.dev = {
+      closeWs: () => state.resolved?.bridge.connection?.ws?.close(),
+      unlink: () => state.resolved?.bridge.unlink(),
+      disconnect: () => state.resolved?.bridge.disconnect(),
+    };
+  }
+
+  return initialApi;
 }
 
 type EnableOutput = {
@@ -213,26 +224,36 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
     }
 
     const controller = new AbortController();
+
     bridge.connection.controller.signal.addEventListener(
       "abort",
       () => controller.abort(),
-      {
-        signal: controller.signal,
-      },
+      { signal: controller.signal },
     );
 
     const deferred = deferredPromise<string>();
 
-    bridge.connection.ws.addEventListener(
+    controller.signal.addEventListener("abort", () => {
+      deferred.reject("aborted");
+    });
+
+    bridge.connection.events.addEventListener(
       "message",
       (event) => {
+        if (!(event instanceof CustomEvent)) {
+          return;
+        }
         try {
-          const json = JSON.parse(event.data);
-          assertSigReqResponse(json);
-          const message = json;
+          const message = event.detail;
+          assertSigReqResponse(message);
           if (message.payload.requestId !== payload.requestId) {
             return;
           }
+
+          bridge.send({
+            type: "client.sig_req_ack",
+            payload: { requestId: message.payload.requestId },
+          });
 
           if (message.type === "client.sig_req_accepted") {
             deferred.resolve(message.payload.signature);
@@ -243,7 +264,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
           controller.abort();
         } catch (error) {
           bridge.debugLog(
-            `error parsing message ${event.data}: ${getFailureReason(error)}`,
+            `error parsing message ${event.detail}: ${getFailureReason(error)}`,
           );
         }
       },
@@ -309,6 +330,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
           requestId: crypto.randomUUID(),
           tx,
           partialSign,
+          capabilities: ["ack"],
         });
       } catch (error) {
         const reason = getFailureReason(error);
@@ -323,6 +345,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
         requestId: crypto.randomUUID(),
         address,
         data,
+        capabilities: ["ack"],
       });
 
       const [signature, key] = res.split("::");
@@ -372,13 +395,16 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       },
     );
 
-    bridge.connection.ws.addEventListener(
+    bridge.connection.events.addEventListener(
       "message",
       (event) => {
+        if (!(event instanceof CustomEvent)) {
+          return;
+        }
         try {
-          const json = JSON.parse(event.data);
-          assertIncomingMessage(json);
-          if (json.type === "client.wallet_updated") {
+          const message = event.detail;
+          assertIncomingMessage(message);
+          if (message.type === "client.wallet_updated") {
             pairingPromise.resolve();
             controller.abort();
           }

@@ -1,5 +1,5 @@
 import { submitTx } from "./anvil";
-import type { EnabledWalletApi } from "./api";
+import type { EnabledWalletApi, InitialWalletApi } from "./api";
 import { type Config, DEFAULT_CONFIG } from "./config";
 import { initialize } from "./lib";
 
@@ -13,35 +13,122 @@ const devConfig: Config = {
   onError: ({ error }) => console.log("socket error:", error ?? "unknown"),
   onClose: ({ code, reason }) => console.log("socket closed:", code, reason),
   onWalletUpdate: (wallet) => console.log("wallet update", wallet),
+  waitForPairing: true,
 };
 
 initialize(devConfig);
 
 let wallet: EnabledWalletApi | undefined;
 
-document.querySelector("#connect")?.addEventListener("click", async () => {
-  wallet = await window.cardano?.hodei?.enable();
-});
+// Kbd shortcuts
+window.onkeydown = (event) => {
+  let fn: (() => void | Promise<void>) | undefined;
 
-document.querySelector("#check")?.addEventListener("click", async () => {
-  const res = await window.cardano?.hodei?.isEnabled();
-  console.log("isEnabled?", res);
-});
-
-document.querySelector("#toggle")?.addEventListener("click", async () => {
-  const existing = document.querySelector("dialog");
-  if (existing) {
-    existing.remove();
-    return;
+  if (event.key === "C") {
+    fn = connect;
+  } else if (event.key === "T") {
+    fn = signTx;
+  } else if (event.key === "G") {
+    fn = delegate;
+  } else if (event.key === "S") {
+    fn = signDataStake;
+  } else if (event.key === "P") {
+    fn = signDataPayment;
+  } else if (event.key === "L") {
+    fn = loseConnection;
+  } else if (event.key === "D") {
+    fn = disconnect;
+  } else if (event.key === "U") {
+    fn = unlink;
   }
 
-  const el = document.createElement("dialog");
-  el.innerText = "my dialog with long text inside it";
-  el.open = true;
-  document.body.appendChild(el);
-});
+  if (fn) {
+    event.preventDefault();
+    event.stopPropagation();
+    fn();
+  }
+};
 
-document.querySelector("#sign-tx")?.addEventListener("click", async () => {
+// Buttons
+document.querySelector("#connect")?.addEventListener("click", connect);
+document.querySelector("#signTx")?.addEventListener("click", signTx);
+document.querySelector("#delegate")?.addEventListener("click", delegate);
+document
+  .querySelector("#signDataStake")
+  ?.addEventListener("click", signDataStake);
+document
+  .querySelector("#signDataPayment")
+  ?.addEventListener("click", signDataPayment);
+document
+  .querySelector("#loseConnection")
+  ?.addEventListener("click", loseConnection);
+document.querySelector("#disconnect")?.addEventListener("click", disconnect);
+
+// Functions
+function loseConnection() {
+  getDevApi()?.closeWs();
+}
+
+async function connect() {
+  try {
+    console.log("connecting");
+    wallet = await window.cardano?.hodei?.enable();
+    console.log("connected and paired!");
+  } catch (error) {
+    console.log("failed to connect:", error);
+  }
+}
+
+async function disconnect() {
+  getDevApi()?.disconnect();
+}
+
+async function unlink() {
+  getDevApi()?.unlink();
+}
+
+async function signDataStake() {
+  try {
+    if (!wallet) {
+      throw new Error("wallet not connected");
+    }
+    const data = utf8ToHex("hello world!");
+    console.log("data", data);
+    const [rewardAddress] = await wallet.getRewardAddresses();
+    if (!rewardAddress) {
+      throw new Error("no reward address");
+    }
+    const signRes = await wallet.signData(rewardAddress, data);
+    console.log("signRes", signRes);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function utf8ToHex(input: string) {
+  const encoder = new TextEncoder();
+  const encoded = encoder.encode(input);
+  return Array.from(encoded, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
+}
+
+async function signDataPayment() {
+  try {
+    if (!wallet) {
+      throw new Error("wallet not connected");
+    }
+    const data = utf8ToHex("hello world!");
+    console.log("data", data);
+    const changeAddress = await wallet.getChangeAddress();
+    const signRes = await wallet.signData(changeAddress, data);
+    console.log("signRes", signRes);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function signTx() {
   try {
     if (!wallet) {
       throw new Error("wallet not connected");
@@ -96,9 +183,9 @@ document.querySelector("#sign-tx")?.addEventListener("click", async () => {
   } catch (error) {
     console.error(error);
   }
-});
+}
 
-document.querySelector("#delegate")?.addEventListener("click", async () => {
+async function delegate() {
   try {
     if (!wallet) {
       throw new Error("wallet not connected");
@@ -167,53 +254,16 @@ document.querySelector("#delegate")?.addEventListener("click", async () => {
   } catch (error) {
     console.error(error);
   }
-});
-
-function utf8ToHex(input: string) {
-  const encoder = new TextEncoder();
-  const encoded = encoder.encode(input);
-  return Array.from(encoded, (byte) => byte.toString(16).padStart(2, "0")).join(
-    "",
-  );
 }
 
-document
-  .querySelector("#sign-data-stake")
-  ?.addEventListener("click", async () => {
-    try {
-      if (!wallet) {
-        throw new Error("wallet not connected");
-      }
-      const data = utf8ToHex("hello world!");
-      console.log("data", data);
-      const [rewardAddress] = await wallet.getRewardAddresses();
-      if (!rewardAddress) {
-        throw new Error("no reward address");
-      }
-      const signRes = await wallet.signData(rewardAddress, data);
-      console.log("signRes", signRes);
-    } catch (error) {
-      console.error(error);
-    }
-  });
+export type DevInitialWalletApi = InitialWalletApi & {
+  dev?: {
+    closeWs(): void;
+    unlink(): void;
+    disconnect(): void;
+  };
+};
 
-document
-  .querySelector("#sign-data-payment")
-  ?.addEventListener("click", async () => {
-    try {
-      if (!wallet) {
-        throw new Error("wallet not connected");
-      }
-      const data = utf8ToHex("hello world!");
-      console.log("data", data);
-      const changeAddress = await wallet.getChangeAddress();
-      const signRes = await wallet.signData(changeAddress, data);
-      console.log("signRes", signRes);
-    } catch (error) {
-      console.error(error);
-    }
-  });
-
-document.querySelector("#disconnect")?.addEventListener("click", async () => {
-  wallet?.disconnect?.();
-});
+function getDevApi(): DevInitialWalletApi["dev"] {
+  return (window.cardano?.hodei as DevInitialWalletApi)?.dev;
+}

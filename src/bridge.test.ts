@@ -4,6 +4,7 @@ import {
   Bridge,
   checkToken,
   isBridgeState,
+  type OutgoingMessage,
 } from "./bridge";
 import { DEFAULT_CONFIG } from "./config";
 import * as storage from "./storage";
@@ -304,9 +305,14 @@ describe("reconnection", () => {
 describe("send", () => {
   it("serializes message to JSON and calls ws.send", async () => {
     const { bridge, ws } = await connectPaired();
-    const msg = {
-      type: "client.sig_req_created" as const,
-      payload: { requestId: "r1", tx: "tx1", partialSign: false },
+    const msg: OutgoingMessage = {
+      type: "client.sig_req_created",
+      payload: {
+        capabilities: ["ack"],
+        requestId: "r1",
+        tx: "tx1",
+        partialSign: false,
+      },
     };
     bridge.send(msg);
     expect(ws.sentMessages[0]).toBe(JSON.stringify(msg));
