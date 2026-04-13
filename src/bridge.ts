@@ -1,10 +1,14 @@
 import type { Config } from "./config";
 import { deleteToken, getToken, setToken } from "./storage";
-import { deferredPromise, getFailureReason } from "./utils";
+import { debounce, deferredPromise, getFailureReason } from "./utils";
 
 export type BridgeOpts = {
   config: Config;
   onStateChange(state: BridgeState): void;
+};
+
+type Subscription = {
+  unsubscribe: () => void;
 };
 
 export type BridgeConnection = {
@@ -13,6 +17,7 @@ export type BridgeConnection = {
   state: BridgeState;
   controller: AbortController;
   events: EventTarget;
+  subscriptions: Subscription[];
 };
 
 export class Bridge {
@@ -75,9 +80,18 @@ export class Bridge {
     }
   }
 
+  private _shutdown(connection: BridgeConnection) {
+    connection.ws.close(1000, "disconnected");
+    for (const sub of connection.subscriptions) {
+      sub.unsubscribe();
+    }
+  }
+
   disconnect(): void {
-    this._connection?.ws.close(1000, "disconnected");
-    this._connection = undefined;
+    if (this._connection) {
+      this._shutdown(this._connection);
+      this._connection = undefined;
+    }
   }
 
   unlink(): void {
@@ -89,7 +103,9 @@ export class Bridge {
   }
 
   private async _connect(): Promise<ConnectionState> {
-    this._connection?.ws.close(1000, "disconnected");
+    if (this._connection) {
+      this._shutdown(this._connection);
+    }
 
     const baseUrl = this._config.bridge.baseUrl.replace("http", "ws");
     const url = new URL(`${baseUrl}/client/ws`);
@@ -149,7 +165,32 @@ export class Bridge {
         // Keep stable references so that event listeners keep working
         controller: this._connection?.controller ?? new AbortController(),
         events: this._connection?.events ?? new EventTarget(),
+        subscriptions: [],
       };
+
+      const reconnect = debounce(() => {
+        this.debugLog("reconnecting");
+        this._reconnectNow();
+      }, 500);
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === "visible") {
+          reconnect();
+        }
+      };
+
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      window.addEventListener("focus", reconnect);
+
+      connection.subscriptions.push({
+        unsubscribe: () => {
+          window.removeEventListener(
+            "visibilityChange",
+            handleVisibilityChange,
+          );
+          window.removeEventListener("focus", reconnect);
+        },
+      });
 
       this._connection = connection;
 
@@ -282,12 +323,36 @@ export class Bridge {
         this.debugLog("reconnect timer cleared. ignoring");
         return;
       }
+
+      if (this.connection?.ws.readyState === WebSocket.OPEN) {
+        this.debugLog("skipping reconnect, socket is connected");
+        return;
+      }
+
       this.debugLog("reconnecting");
       this._reconnectTimer = undefined;
       this._connect().catch(() => this._scheduleReconnect());
     }, delay);
 
     this._reconnectTimer = timer;
+
+    return true;
+  }
+
+  private _reconnectNow() {
+    if (this.connection?.ws.readyState === WebSocket.OPEN) {
+      this.debugLog("skipping reconnect, socket is connected");
+      return;
+    }
+
+    if (this._reconnectTimer) {
+      this.debugLog("clearing reconnect timer");
+      clearTimeout(this._reconnectTimer);
+    }
+
+    this.debugLog("reconnecting now");
+    this._reconnectTimer = undefined;
+    this._connect().catch(() => this._scheduleReconnect());
 
     return true;
   }

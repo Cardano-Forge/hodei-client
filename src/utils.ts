@@ -48,3 +48,15 @@ export function hasProperty<P extends string>(
 ): obj is { [K in P]: unknown } {
   return typeof obj === "object" && obj !== null && property in obj;
 }
+
+export function debounce(fn: () => void, delay: number) {
+  let timer: number | undefined;
+  return () => {
+    if (!timer) {
+      timer = setTimeout(() => {
+        fn();
+        timer = undefined;
+      }, delay);
+    }
+  };
+}
