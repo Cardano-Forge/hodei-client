@@ -183,7 +183,7 @@ export class Bridge {
         }
       };
 
-      document.addEventListener("visibilitychange", handleVisibilityChange);
+      document.addEventListener("visibilityChange", handleVisibilityChange);
       window.addEventListener("focus", reconnect);
 
       connection.subscriptions.push({
