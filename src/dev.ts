@@ -2,6 +2,7 @@ import { submitTx } from "./anvil";
 import type { EnabledWalletApi, InitialWalletApi } from "./api";
 import { type Config, DEFAULT_CONFIG } from "./config";
 import { initialize } from "./lib";
+import { assert } from "./utils";
 
 const devConfig: Config = {
   ...DEFAULT_CONFIG,
@@ -10,11 +11,23 @@ const devConfig: Config = {
     baseUrl: "http://localhost:8000",
   },
   debug: true,
-  onError: ({ error }) => console.log("socket error:", error ?? "unknown"),
-  onClose: ({ code, reason }) => console.log("socket closed:", code, reason),
-  onWalletUpdate: (wallet) => console.log("wallet update", wallet),
+  onError: ({ error }) => {
+    updateWalletState({ status: "error", error: error ?? "unknown" });
+  },
+  onClose: ({ code, reason }) => {
+    updateWalletState({ status: "closed", code, reason });
+  },
+  onWalletUpdate: (wallet) => {
+    updateWalletState({ status: "connected", ...wallet });
+  },
   waitForPairing: true,
 };
+
+function updateWalletState(state: unknown) {
+  const el = document.querySelector("#walletState");
+  assert(el);
+  el.innerHTML = JSON.stringify(state, null, 2);
+}
 
 initialize(devConfig);
 

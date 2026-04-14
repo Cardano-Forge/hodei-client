@@ -60,3 +60,15 @@ export function debounce(fn: () => void, delay: number) {
     }
   };
 }
+
+export function assert(
+  condition: unknown,
+  explanation?: string,
+): asserts condition {
+  if (condition) {
+    return;
+  }
+  let msg = "Assertion failed";
+  if (explanation) msg += `: ${explanation}`;
+  throw new Error(msg);
+}

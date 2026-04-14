@@ -8,13 +8,28 @@
   <title>hodei-client</title>
 
   <style>
+    article {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
     body {
       display: flex;
-      gap: 4px;
-      flex-wrap: wrap;
-      max-width: 400px;
+      flex-direction: column;
       margin: 0 auto;
       padding: 20px;
+      gap: 16px;
+      overflow: hidden;
+    }
+
+    #controls>ul {
+      max-width: 400px;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
 
       button {
         flex: 1 1 auto;
@@ -24,14 +39,27 @@
 </head>
 
 <body>
-  <button type="button" id="connect">[C]onnect</button>
-  <button type="button" id="signTx">sign [T]x</button>
-  <button type="button" id="delegate">dele[G]ate</button>
-  <button type="button" id="signDataStake">sign data [S]take</button>
-  <button type="button" id="signDataPayment">sign data [P]ayment</button>
-  <button type="button" id="loseConnection">[L]ose connection</button>
-  <button type="button" id="disconnect">[D]isconnect</button>
-  <button type="button" id="unlink">[U]nlink</button>
+  <section id="buttons">
+    <article id="controls">
+      <header>Controls</header>
+      <ul>
+        <button type="button" id="connect">[C]onnect</button>
+        <button type="button" id="signTx">sign [T]x</button>
+        <button type="button" id="delegate">dele[G]ate</button>
+        <button type="button" id="signDataStake">sign data [S]take</button>
+        <button type="button" id="signDataPayment">sign data [P]ayment</button>
+        <button type="button" id="loseConnection">[L]ose connection</button>
+        <button type="button" id="disconnect">[D]isconnect</button>
+        <button type="button" id="unlink">[U]nlink</button>
+      </ul>
+    </article>
+  </section>
+  <section id="state">
+    <article>
+      <header>State</header>
+      <pre id="walletState">{<br>  "status": "disconnected"<br>}</pre>
+    </article>
+  </section>
   <script type="module" src="/src/dev.ts"></script>
 </body>
 
