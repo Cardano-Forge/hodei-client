@@ -246,53 +246,35 @@ async function enable(input: Bridge | BridgeOpts): Promise<EnableOutput> {
       throw createApiError("refused", new Error("Wallet is not connected"));
     }
 
-    const controller = new AbortController();
-
-    bridge.connection.controller.signal.addEventListener(
-      "abort",
-      () => controller.abort(),
-      { signal: controller.signal },
-    );
-
     const deferred = deferredPromise<string>();
 
-    controller.signal.addEventListener("abort", () => {
-      deferred.reject("aborted");
-    });
-
-    bridge.connection.events.addEventListener(
-      "message",
-      (event) => {
-        if (!(event instanceof CustomEvent)) {
+    bridge.connection.events.addEventListener("message", (event) => {
+      if (!(event instanceof CustomEvent)) {
+        return;
+      }
+      try {
+        const message = event.detail;
+        assertSigReqResponse(message);
+        if (message.payload.requestId !== payload.requestId) {
           return;
         }
-        try {
-          const message = event.detail;
-          assertSigReqResponse(message);
-          if (message.payload.requestId !== payload.requestId) {
-            return;
-          }
 
-          bridge.send({
-            type: "client.sig_req_ack",
-            payload: { requestId: message.payload.requestId },
-          });
+        bridge.send({
+          type: "client.sig_req_ack",
+          payload: { requestId: message.payload.requestId },
+        });
 
-          if (message.type === "client.sig_req_accepted") {
-            deferred.resolve(message.payload.signature);
-          } else {
-            deferred.reject(message.payload.reason);
-          }
-
-          controller.abort();
-        } catch (error) {
-          bridge.debugLog(
-            `error parsing message ${event.detail}: ${getFailureReason(error)}`,
-          );
+        if (message.type === "client.sig_req_accepted") {
+          deferred.resolve(message.payload.signature);
+        } else {
+          deferred.reject(message.payload.reason);
         }
-      },
-      { signal: controller.signal },
-    );
+      } catch (error) {
+        bridge.debugLog(
+          `error parsing message ${event.detail}: ${getFailureReason(error)}`,
+        );
+      }
+    });
 
     bridge.send({
       type: "client.sig_req_created",
