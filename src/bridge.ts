@@ -21,7 +21,7 @@ export type BridgeConnection = {
 };
 
 export class Bridge {
-  private readonly _config: Config;
+  readonly config: Config;
   private readonly _onStateChange: (state: BridgeState) => void;
   private _debug: boolean;
 
@@ -29,7 +29,7 @@ export class Bridge {
   private _connection?: BridgeConnection;
 
   constructor(opts: BridgeOpts) {
-    this._config = opts.config;
+    this.config = opts.config;
     this._onStateChange = opts.onStateChange;
     this._debug = opts.config?.debug ?? false;
   }
@@ -107,7 +107,7 @@ export class Bridge {
       this._shutdown(this._connection);
     }
 
-    const baseUrl = this._config.bridge.baseUrl.replace("http", "ws");
+    const baseUrl = this.config.bridge.baseUrl.replace("http", "ws");
     const url = new URL(`${baseUrl}/client/ws`);
 
     const token = await this._getToken();
@@ -162,15 +162,15 @@ export class Bridge {
         id: connectionId,
         ws,
         state: state as BridgeState,
-        // Keep stable references so that event listeners keep working
-        controller: this._connection?.controller ?? new AbortController(),
+        controller: new AbortController(),
+        // Keep stable reference so that event listeners keep working
         events: this._connection?.events ?? new EventTarget(),
         subscriptions: [],
       };
 
       const reconnect = debounce(() => {
         this.debugLog("reconnecting");
-        this._reconnectNow();
+        this.reconnectNow();
       }, 500);
 
       const handleVisibilityChange = () => {
@@ -210,6 +210,8 @@ export class Bridge {
 
             const json = JSON.parse(event.data);
             assertIncomingMessage(json);
+
+            this.debugLog("received message", json);
 
             this._connection?.events.dispatchEvent(
               new CustomEvent("message", {
@@ -306,6 +308,25 @@ export class Bridge {
     this.connection?.ws.send(JSON.stringify(message));
   }
 
+  async reconnectNow(): Promise<ConnectionState> {
+    if (
+      this.isConnected() &&
+      this.connection?.ws.readyState === WebSocket.OPEN
+    ) {
+      this.debugLog("skipping reconnect, socket is connected");
+      return this.connection.state;
+    }
+
+    if (this._reconnectTimer) {
+      this.debugLog("clearing reconnect timer");
+      clearTimeout(this._reconnectTimer);
+    }
+
+    this.debugLog("reconnecting now");
+    this._reconnectTimer = undefined;
+    return this._connect();
+  }
+
   private _attempts = 0;
   private _reconnectTimer?: number;
   private _scheduleReconnect(): boolean {
@@ -314,7 +335,7 @@ export class Bridge {
       clearTimeout(this._reconnectTimer);
     }
 
-    let cfg = this._config.retry;
+    let cfg = this.config.retry;
 
     if (!cfg) {
       this.debugLog("skipping retry because retrying has been disabled.");
@@ -349,35 +370,14 @@ export class Bridge {
 
     if (delay > 0) {
       const timer = setTimeout(() => {
-        this._reconnectNow(timer);
+        this.reconnectNow().catch(() => this._scheduleReconnect());
       }, delay);
       this._reconnectTimer = timer;
     } else {
-      this._reconnectNow();
+      this.reconnectNow().catch(() => this._scheduleReconnect());
     }
 
     return true;
-  }
-
-  private _reconnectNow(timer?: number) {
-    if (this.connection?.ws.readyState === WebSocket.OPEN) {
-      this.debugLog("skipping reconnect, socket is connected");
-      return;
-    }
-
-    if (typeof timer === "number" && this._reconnectTimer !== timer) {
-      this.debugLog("reconnect timer cleared. ignoring");
-      return;
-    }
-
-    if (this._reconnectTimer) {
-      this.debugLog("clearing reconnect timer");
-      clearTimeout(this._reconnectTimer);
-    }
-
-    this.debugLog("reconnecting now");
-    this._reconnectTimer = undefined;
-    this._connect().catch(() => this._scheduleReconnect());
   }
 
   private async _getToken(): Promise<string | undefined> {
@@ -386,7 +386,7 @@ export class Bridge {
       return undefined;
     }
 
-    const checked = await checkToken({ config: this._config, token });
+    const checked = await checkToken({ config: this.config, token });
 
     this.debugLog(
       `checked token: ${checked.valid ? "valid" : `invalid: ${checked.reason}`}`,

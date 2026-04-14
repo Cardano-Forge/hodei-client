@@ -33,6 +33,8 @@ initialize(devConfig);
 
 let wallet: EnabledWalletApi | undefined;
 
+connect();
+
 // Kbd shortcuts
 window.onkeydown = (event) => {
   let fn: (() => void | Promise<void>) | undefined;
@@ -53,6 +55,8 @@ window.onkeydown = (event) => {
     fn = disconnect;
   } else if (event.key === "U") {
     fn = unlink;
+  } else if (event.key === "K") {
+    fn = clearConsole;
   }
 
   if (fn) {
@@ -79,7 +83,7 @@ document.querySelector("#disconnect")?.addEventListener("click", disconnect);
 
 // Functions
 function loseConnection() {
-  getDevApi()?.closeWs();
+  getDevApi()?.toggleWs();
 }
 
 async function connect() {
@@ -98,6 +102,10 @@ async function disconnect() {
 
 async function unlink() {
   getDevApi()?.unlink();
+}
+
+async function clearConsole() {
+  console.clear();
 }
 
 async function signDataStake() {
@@ -271,7 +279,7 @@ async function delegate() {
 
 export type DevInitialWalletApi = InitialWalletApi & {
   dev?: {
-    closeWs(): void;
+    toggleWs(): void;
     unlink(): void;
     disconnect(): void;
   };

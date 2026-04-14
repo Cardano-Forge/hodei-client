@@ -97,6 +97,10 @@ export function createInitialWalletApi(
         return state.resolved.api;
       }
 
+      if (!state.promise && state.resolved) {
+        state.promise = enable(state.resolved.bridge);
+      }
+
       if (!state.promise) {
         state.promise = enable({
           config: state.config,
@@ -151,9 +155,25 @@ export function createInitialWalletApi(
 
   if (import.meta.env.MODE === "development") {
     initialApi.dev = {
-      closeWs: () => {
-        state.config.retry = false;
-        state.resolved?.bridge.connection?.ws?.close();
+      toggleWs: () => {
+        const bridge = state.resolved?.bridge;
+
+        if (!bridge?.connection) {
+          console.log(
+            "[DEV] can't toggle ws connection: bridge is not connected",
+          );
+          return;
+        }
+
+        if (bridge.connection.ws.readyState === WebSocket.OPEN) {
+          console.log("[DEV] closing ws connection and disabling retry");
+          state.config.retry = false;
+          bridge.connection.ws.close();
+        } else {
+          console.log("[DEV] reconnecting and enabling retry");
+          state.config.retry = true;
+          bridge.reconnectNow();
+        }
       },
       unlink: () => state.resolved?.bridge.unlink(),
       disconnect: () => state.resolved?.bridge.disconnect(),
@@ -170,10 +190,10 @@ type EnableOutput = {
   pairingPromise: Promise<void>;
 };
 
-async function enable(input: BridgeOpts): Promise<EnableOutput> {
+async function enable(input: Bridge | BridgeOpts): Promise<EnableOutput> {
   const client = await mountClient();
 
-  const bridge = new Bridge(input);
+  const bridge = input instanceof Bridge ? input : new Bridge(input);
 
   await bridge.connect();
 
@@ -288,7 +308,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       const bridgeState = ensurePaired();
       try {
         const utxos = await getUtxos({
-          config: input.config,
+          config: bridge.config,
           network: bridgeState.network,
           address: bridgeState.baseAddress,
         });
@@ -302,7 +322,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       const bridgeState = ensurePaired();
       try {
         const balance = await getBalance({
-          config: input.config,
+          config: bridge.config,
           network: bridgeState.network,
           address: bridgeState.baseAddress,
         });
@@ -365,7 +385,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       const bridgeState = ensurePaired();
       try {
         const res = await submitTx({
-          config: input.config,
+          config: bridge.config,
           network: bridgeState.network,
           transaction,
         });
