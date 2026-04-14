@@ -169,8 +169,12 @@ export class Bridge {
       };
 
       const reconnect = debounce(() => {
-        this.debugLog("reconnecting");
-        this.reconnectNow();
+        if (this.config.retry) {
+          this.debugLog("reconnecting");
+          this.reconnectNow();
+        } else {
+          this.debugLog("skipping reconnect: retrying is disabled");
+        }
       }, 500);
 
       const handleVisibilityChange = () => {
