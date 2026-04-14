@@ -151,7 +151,9 @@ export function createInitialWalletApi(
 
   if (import.meta.env.MODE === "development") {
     initialApi.dev = {
-      closeWs: () => state.resolved?.bridge.connection?.ws?.close(),
+      closeWs: () => {
+        state.resolved?.bridge.connection?.ws?.close();
+      },
       unlink: () => state.resolved?.bridge.unlink(),
       disconnect: () => state.resolved?.bridge.disconnect(),
     };

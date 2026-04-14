@@ -1,4 +1,4 @@
-import type { Config } from "./config";
+import { type Config, DEFAULT_RETRY_CONFIG } from "./config";
 import { deleteToken, getToken, setToken } from "./storage";
 import { debounce, deferredPromise, getFailureReason } from "./utils";
 
@@ -314,34 +314,59 @@ export class Bridge {
       clearTimeout(this._reconnectTimer);
     }
 
-    this._attempts = Math.min(this._attempts + 1, 5);
-    const delay = 2 ** this._attempts * 1000;
+    let cfg = this._config.retry;
+
+    if (!cfg) {
+      this.debugLog("skipping retry because retrying has been disabled.");
+      return false;
+    }
+
+    if (cfg === true) {
+      cfg = DEFAULT_RETRY_CONFIG;
+    }
+
+    if (this._attempts >= (cfg.maxRetries ?? Number.POSITIVE_INFINITY)) {
+      this.debugLog(`reached maximum of ${cfg.maxRetries} retries, stopping.`);
+      return false;
+    }
+
+    const baseDelay = Math.max(0, cfg.baseDelay);
+
+    let delay: number;
+    if (cfg.backoff) {
+      delay = baseDelay * 2 ** this._attempts;
+    } else {
+      delay = baseDelay;
+    }
+
+    if (cfg.maxDelay) {
+      delay = Math.min(delay, cfg.maxDelay);
+    }
+
     this.debugLog(`reconnecting in ${delay / 1000}s`);
 
-    const timer = setTimeout(() => {
-      if (this._reconnectTimer !== timer) {
-        this.debugLog("reconnect timer cleared. ignoring");
-        return;
-      }
+    this._attempts += 1;
 
-      if (this.connection?.ws.readyState === WebSocket.OPEN) {
-        this.debugLog("skipping reconnect, socket is connected");
-        return;
-      }
-
-      this.debugLog("reconnecting");
-      this._reconnectTimer = undefined;
-      this._connect().catch(() => this._scheduleReconnect());
-    }, delay);
-
-    this._reconnectTimer = timer;
+    if (delay > 0) {
+      const timer = setTimeout(() => {
+        this._reconnectNow(timer);
+      }, delay);
+      this._reconnectTimer = timer;
+    } else {
+      this._reconnectNow();
+    }
 
     return true;
   }
 
-  private _reconnectNow() {
+  private _reconnectNow(timer?: number) {
     if (this.connection?.ws.readyState === WebSocket.OPEN) {
       this.debugLog("skipping reconnect, socket is connected");
+      return;
+    }
+
+    if (typeof timer === "number" && this._reconnectTimer !== timer) {
+      this.debugLog("reconnect timer cleared. ignoring");
       return;
     }
 
@@ -353,8 +378,6 @@ export class Bridge {
     this.debugLog("reconnecting now");
     this._reconnectTimer = undefined;
     this._connect().catch(() => this._scheduleReconnect());
-
-    return true;
   }
 
   private async _getToken(): Promise<string | undefined> {

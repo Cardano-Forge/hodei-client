@@ -11,6 +11,7 @@ export type Config = {
   >;
   debug: boolean;
   waitForPairing: boolean;
+  retry: RetryConfig | boolean;
   onError(data: { error?: string }): void;
   onClose(data: { code: number; reason: string }): void;
   onWalletUpdate?(wallet: {
@@ -18,6 +19,24 @@ export type Config = {
     stakeAddress: string;
     network: "mainnet" | "preprod";
   }): void;
+};
+
+export type RetryConfig = {
+  /** Maximum number of retries */
+  maxRetries?: number;
+  /** Base delay in milliseconds between retries */
+  baseDelay: number;
+  /** Maximum delay in milliseconds between retries */
+  maxDelay?: number;
+  /** Use exponential backoff (default: true) */
+  backoff?: boolean;
+};
+
+export const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxRetries: undefined,
+  baseDelay: 2000,
+  maxDelay: 32_000,
+  backoff: true,
 };
 
 export const DEFAULT_CONFIG: Config = {
@@ -35,6 +54,7 @@ export const DEFAULT_CONFIG: Config = {
     },
   },
   debug: false,
+  retry: true, // Use the DEFAULT_RETRY_CONFIG
   waitForPairing: true,
   onError: ({ error }) =>
     console.error("[HODEI] unhandled error:", error ?? "unknown"),
