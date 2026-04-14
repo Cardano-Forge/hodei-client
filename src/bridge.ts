@@ -479,12 +479,12 @@ type WalletUpdatedMessage = {
 
 type SigReqAcceptedMessage = {
   type: "client.sig_req_accepted";
-  payload: { requestId: string; signature: string };
+  payload: { vaultId: string; requestId: string; signature: string };
 };
 
 type SigReqRejectedMessage = {
   type: "client.sig_req_rejected";
-  payload: { requestId: string; reason: string };
+  payload: { vaultId: string; requestId: string; reason: string };
 };
 
 export type SigReqResponseMessage =
@@ -495,7 +495,7 @@ type IncomingMessage = WalletUpdatedMessage | SigReqResponseMessage;
 
 export type SigReqAckMessage = {
   type: "client.sig_req_ack";
-  payload: { requestId: string };
+  payload: { vaultId: string; requestId: string };
 };
 
 export type SigReqCreatedMessage = {

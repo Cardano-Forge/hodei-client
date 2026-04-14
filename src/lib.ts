@@ -261,7 +261,10 @@ async function enable(input: Bridge | BridgeOpts): Promise<EnableOutput> {
 
         bridge.send({
           type: "client.sig_req_ack",
-          payload: { requestId: message.payload.requestId },
+          payload: {
+            vaultId: message.payload.vaultId,
+            requestId: message.payload.requestId,
+          },
         });
 
         if (message.type === "client.sig_req_accepted") {
