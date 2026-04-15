@@ -453,6 +453,7 @@ export type ConnectionState =
       status: "paired";
       sessionId: string;
       token: string;
+      vaultId: string;
       baseAddress: string;
       stakeAddress: string;
       network: "mainnet" | "preprod";
@@ -471,6 +472,7 @@ type ConnectedMessage = {
 type WalletUpdatedMessage = {
   type: "client.wallet_updated";
   payload: {
+    vaultId: string;
     baseAddress: string;
     stakeAddress: string;
     network: "mainnet" | "preprod";
@@ -479,12 +481,12 @@ type WalletUpdatedMessage = {
 
 type SigReqAcceptedMessage = {
   type: "client.sig_req_accepted";
-  payload: { vaultId: string; requestId: string; signature: string };
+  payload: { requestId: string; signature: string };
 };
 
 type SigReqRejectedMessage = {
   type: "client.sig_req_rejected";
-  payload: { vaultId: string; requestId: string; reason: string };
+  payload: { requestId: string; reason: string };
 };
 
 export type SigReqResponseMessage =

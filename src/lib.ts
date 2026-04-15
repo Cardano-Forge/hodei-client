@@ -259,10 +259,12 @@ async function enable(input: Bridge | BridgeOpts): Promise<EnableOutput> {
           return;
         }
 
+        const state = ensurePaired();
+
         bridge.send({
           type: "client.sig_req_ack",
           payload: {
-            vaultId: message.payload.vaultId,
+            vaultId: state.vaultId,
             requestId: message.payload.requestId,
           },
         });

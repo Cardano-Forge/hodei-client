@@ -74,6 +74,7 @@ export const pairedPayload = {
   status: "paired" as const,
   sessionId: "sess-1",
   token: "tok-1",
+  vaultId: "vault-1",
   baseAddress: "addr_base",
   stakeAddress: "addr_stake",
   network: "mainnet" as const,
