@@ -1,4 +1,14 @@
-export function deferredPromise<T = void, R = unknown>() {
+export type DeferredPromise<T, R> = {
+  status: "pending";
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: R) => void;
+};
+
+export function deferredPromise<T = void, R = unknown>(): DeferredPromise<
+  T,
+  R
+> {
   let status: "pending" | "resolved" | "rejected" = "pending";
   let resolve: (value: T | PromiseLike<T>) => void = () => undefined;
   let reject: (reason?: R) => void = () => undefined;

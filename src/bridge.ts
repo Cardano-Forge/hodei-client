@@ -1,6 +1,12 @@
 import { type Config, DEFAULT_RETRY_CONFIG } from "./config";
+import { createApiError } from "./error";
 import { deleteToken, getToken, setToken } from "./storage";
-import { debounce, deferredPromise, getFailureReason } from "./utils";
+import {
+  type DeferredPromise,
+  debounce,
+  deferredPromise,
+  getFailureReason,
+} from "./utils";
 
 export type BridgeOpts = {
   config: Config;
@@ -24,6 +30,8 @@ export class Bridge {
   readonly config: Config;
   private readonly _onStateChange: (state: BridgeState) => void;
   private _debug: boolean;
+
+  private _sigReqPromises = new Map<string, DeferredPromise<string, string>>();
 
   private _connectPromise: Promise<ConnectionState> | undefined;
   private _connection?: BridgeConnection;
@@ -129,6 +137,49 @@ export class Bridge {
           const json = JSON.parse(event.data);
           assertConnectedMessage(json);
           this.debugLog("received connection message");
+
+          if (
+            json.payload.status === "paired" &&
+            this._sigReqPromises.size > 0
+          ) {
+            const updatedPromises: typeof this._sigReqPromises = new Map();
+            for (const resp of json.payload.sigReqs ?? []) {
+              const deferred = this._sigReqPromises.get(resp.requestId);
+              if (!deferred) {
+                continue;
+              }
+
+              this._sigReqPromises.delete(resp.requestId);
+
+              if (!resp.response) {
+                updatedPromises.set(resp.requestId, deferred);
+                continue;
+              }
+
+              ws.send(
+                JSON.stringify({
+                  type: "client.sig_req_ack",
+                  payload: {
+                    vaultId: json.payload.vaultId,
+                    requestId: resp.requestId,
+                  },
+                }),
+              );
+
+              if (resp.response.status === "accepted") {
+                deferred.resolve(resp.response.data);
+              } else {
+                deferred.reject(resp.response.data);
+              }
+            }
+
+            for (const deferred of this._sigReqPromises.values()) {
+              deferred.reject("request expired");
+            }
+
+            this._sigReqPromises = updatedPromises;
+          }
+
           deferred.resolve(json.payload);
         } catch (error) {
           deferred.reject(
@@ -312,6 +363,58 @@ export class Bridge {
     this.connection?.ws.send(JSON.stringify(message));
   }
 
+  handleSigReq(payload: SigReqCreatedMessage["payload"]): Promise<string> {
+    if (!this.isConnected()) {
+      throw createApiError("refused", new Error("Wallet is not connected"));
+    }
+
+    const deferred = deferredPromise<string>();
+
+    this._sigReqPromises.set(payload.requestId, deferred);
+
+    this.connection.events.addEventListener("message", (event) => {
+      if (!(event instanceof CustomEvent)) {
+        return;
+      }
+      try {
+        const message = event.detail;
+        assertSigReqResponse(message);
+        if (message.payload.requestId !== payload.requestId) {
+          return;
+        }
+
+        this._sigReqPromises.delete(payload.requestId);
+
+        if (this.connection.state.status === "paired") {
+          this.send({
+            type: "client.sig_req_ack",
+            payload: {
+              vaultId: this.connection.state.vaultId,
+              requestId: payload.requestId,
+            },
+          });
+        }
+
+        if (message.type === "client.sig_req_accepted") {
+          deferred.resolve(message.payload.signature);
+        } else {
+          deferred.reject(message.payload.reason);
+        }
+      } catch (error) {
+        this.debugLog(
+          `error parsing message ${event.detail}: ${getFailureReason(error)}`,
+        );
+      }
+    });
+
+    this.send({
+      type: "client.sig_req_created",
+      payload: payload,
+    });
+
+    return deferred.promise;
+  }
+
   async reconnectNow(): Promise<ConnectionState> {
     if (
       this.isConnected() &&
@@ -466,7 +569,15 @@ export type BridgeState =
 
 type ConnectedMessage = {
   type: "client.connected";
-  payload: ConnectionState;
+  payload: ConnectionState & {
+    sigReqs?: {
+      requestId: string;
+      response?: {
+        status: "accepted" | "rejected";
+        data: string;
+      };
+    }[];
+  };
 };
 
 type WalletUpdatedMessage = {

@@ -2,12 +2,10 @@ import { getBalance, getUtxos, submitTx } from "./anvil";
 import type { DataSignature, EnabledWalletApi, InitialWalletApi } from "./api";
 import {
   assertIncomingMessage,
-  assertSigReqResponse,
   Bridge,
   type BridgeOpts,
   type BridgeState,
   checkToken,
-  type SigReqCreatedMessage,
 } from "./bridge";
 import { addCommandListener, type Command, sendCommand } from "./command";
 import { type Config, DEFAULT_CONFIG } from "./config";
@@ -237,58 +235,6 @@ async function enable(input: Bridge | BridgeOpts): Promise<EnableOutput> {
     return bridgeState;
   };
 
-  const handleSigReq = async (
-    payload: SigReqCreatedMessage["payload"],
-  ): Promise<string> => {
-    ensurePaired();
-
-    if (!bridge.isConnected()) {
-      throw createApiError("refused", new Error("Wallet is not connected"));
-    }
-
-    const deferred = deferredPromise<string>();
-
-    bridge.connection.events.addEventListener("message", (event) => {
-      if (!(event instanceof CustomEvent)) {
-        return;
-      }
-      try {
-        const message = event.detail;
-        assertSigReqResponse(message);
-        if (message.payload.requestId !== payload.requestId) {
-          return;
-        }
-
-        const state = ensurePaired();
-
-        bridge.send({
-          type: "client.sig_req_ack",
-          payload: {
-            vaultId: state.vaultId,
-            requestId: message.payload.requestId,
-          },
-        });
-
-        if (message.type === "client.sig_req_accepted") {
-          deferred.resolve(message.payload.signature);
-        } else {
-          deferred.reject(message.payload.reason);
-        }
-      } catch (error) {
-        bridge.debugLog(
-          `error parsing message ${event.detail}: ${getFailureReason(error)}`,
-        );
-      }
-    });
-
-    bridge.send({
-      type: "client.sig_req_created",
-      payload: payload,
-    });
-
-    return deferred.promise;
-  };
-
   const api: EnabledWalletApi = {
     getNetworkId: async () => (ensurePaired().network === "mainnet" ? 1 : 0),
     getUtxos: async () => {
@@ -336,7 +282,7 @@ async function enable(input: Bridge | BridgeOpts): Promise<EnableOutput> {
     },
     signTx: async (tx, partialSign = false) => {
       try {
-        return await handleSigReq({
+        return await bridge.handleSigReq({
           requestId: crypto.randomUUID(),
           tx,
           partialSign,
@@ -351,7 +297,7 @@ async function enable(input: Bridge | BridgeOpts): Promise<EnableOutput> {
       }
     },
     signData: async (address, data) => {
-      const res = await handleSigReq({
+      const res = await bridge.handleSigReq({
         requestId: crypto.randomUUID(),
         address,
         data,
