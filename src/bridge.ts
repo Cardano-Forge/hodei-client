@@ -3,9 +3,9 @@ import { createApiError } from "./error";
 import { deleteToken, getToken, setToken } from "./storage";
 import {
   type DeferredPromise,
+  debounce,
   deferredPromise,
   getFailureReason,
-  debounce,
 } from "./utils";
 
 export type BridgeOpts = {
@@ -25,7 +25,6 @@ export type BridgeConnection = {
 const CLOSE_CODES = {
   NormalClosure: 1000,
   SessionDeleted: 4001,
-  ConnectionStolen: 4002,
   // Used to test connection lost states in dev
   ArtificiallyHanged: 4999,
 };
@@ -336,7 +335,6 @@ export class Bridge {
       ws.addEventListener(
         "close",
         async (event) => {
-          // Session deleted
           if (event.code === CLOSE_CODES.SessionDeleted) {
             this.debugLog("session deleted");
             deleteToken();
@@ -347,7 +345,10 @@ export class Bridge {
             return;
           }
 
-          if (event.code !== CLOSE_CODES.NormalClosure) {
+          if (
+            event.code !== CLOSE_CODES.NormalClosure &&
+            event.code !== CLOSE_CODES.SessionDeleted
+          ) {
             const state = await this.reconnect();
             if (state) {
               this.debugLog("reconnected after close");
