@@ -154,15 +154,18 @@ export function createInitialWalletApi(
   if (import.meta.env.MODE === "development") {
     initialApi.dev = {
       hang: () => {
-        const ws = state.resolved?.bridge?.connection?.ws;
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.close(4999);
+        const bridge = state.resolved?.bridge;
+        if (bridge?.connection?.ws?.readyState === WebSocket.OPEN) {
+          bridge.connection.ws.close(4999);
+        } else if (bridge?.connection) {
+          bridge.reconnect();
         } else {
           console.log(
             "[DEV] can't hang ws connection: bridge is not connected",
           );
         }
       },
+      debug: () => state.resolved?.bridge.debugLogState(),
       unlink: () => state.resolved?.bridge.unlink(),
       disconnect: () => state.resolved?.bridge.disconnect(),
     };

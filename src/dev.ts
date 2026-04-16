@@ -60,6 +60,8 @@ window.onkeydown = (event) => {
     fn = disconnect;
   } else if (event.key === "U") {
     fn = unlink;
+  } else if (event.key === "B") {
+    fn = debug;
   } else if (event.key === "K") {
     fn = clearConsole;
   }
@@ -82,11 +84,16 @@ document
   .querySelector("#signDataPayment")
   ?.addEventListener("click", signDataPayment);
 document.querySelector("#hang")?.addEventListener("click", hang);
+document.querySelector("#debug")?.addEventListener("click", debug);
 document.querySelector("#disconnect")?.addEventListener("click", disconnect);
 
 // Functions
 function hang() {
   getDevApi()?.hang();
+}
+
+function debug() {
+  getDevApi()?.debug();
 }
 
 async function connect() {
@@ -283,6 +290,7 @@ async function delegate() {
 export type DevInitialWalletApi = InitialWalletApi & {
   dev?: {
     hang(): void;
+    debug(): void;
     unlink(): void;
     disconnect(): void;
   };
