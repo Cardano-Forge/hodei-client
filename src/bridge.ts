@@ -301,8 +301,8 @@ export class Bridge {
 
       ws.addEventListener(
         "error",
-        (event) => {
-          if (this._scheduleReconnect()) {
+        async (event) => {
+          if (await this._scheduleReconnect()) {
             this.debugLog("scheduled reconnect after error");
             return;
           }
@@ -465,8 +465,10 @@ export class Bridge {
     const baseDelay = Math.max(0, cfg.baseDelay);
 
     let delay: number;
-    if (cfg.backoff) {
-      delay = baseDelay * 2 ** this._attempts;
+    if (this._attempts === 0) {
+      delay = 0;
+    } else if (cfg.backoff) {
+      delay = baseDelay * 2 ** (this._attempts - 1);
     } else {
       delay = baseDelay;
     }

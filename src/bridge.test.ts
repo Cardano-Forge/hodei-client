@@ -263,14 +263,16 @@ describe("reconnection", () => {
     expect(MockWebSocket.instances.length).toBe(countBefore + 1);
   });
 
-  it("exponential backoff: 2s, 4s, 8s, 16s, 32s", async () => {
+  it("exponential backoff: 0s, 2s, 4s, 8s, 16s, 32s", async () => {
     await connectWithFakeTimers();
 
-    const delays = [2000, 4000, 8000, 16000, 32000];
+    const delays = [0, 2000, 4000, 8000, 16000, 32000];
     for (const delay of delays) {
       const countBefore = MockWebSocket.instances.length;
       latestWS().simulateClose(1006);
-      await vi.advanceTimersByTimeAsync(delay - 1);
+      if (delay > 0) {
+        await vi.advanceTimersByTimeAsync(delay - 1);
+      }
       expect(MockWebSocket.instances.length).toBe(countBefore);
       await vi.advanceTimersByTimeAsync(1);
       expect(MockWebSocket.instances.length).toBe(countBefore + 1);
