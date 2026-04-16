@@ -30,6 +30,8 @@ export type RetryConfig = {
   maxDelay?: number;
   /** Use exponential backoff (default: true) */
   backoff?: boolean;
+  /** When true, the system won't try to reconnect immediately after connection loss (default: false) */
+  skipImmediate?: boolean;
 };
 
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {
@@ -37,6 +39,7 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
   baseDelay: 2000,
   maxDelay: 32_000,
   backoff: true,
+  skipImmediate: false,
 };
 
 export const DEFAULT_CONFIG: Config = {

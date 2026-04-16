@@ -8,7 +8,7 @@ import {
   checkToken,
 } from "./bridge";
 import { addCommandListener, type Command, sendCommand } from "./command";
-import { type Config, DEFAULT_CONFIG } from "./config";
+import { type Config, DEFAULT_CONFIG, type RetryConfig } from "./config";
 import type { DevInitialWalletApi } from "./dev";
 import {
   createApiError,
@@ -152,11 +152,22 @@ export function createInitialWalletApi(
   };
 
   if (import.meta.env.MODE === "development") {
+    let prevConfig: RetryConfig | boolean | undefined;
     initialApi.dev = {
       hang: () => {
+        if (prevConfig) {
+          state.config.retry = prevConfig;
+          prevConfig = undefined;
+        }
         const bridge = state.resolved?.bridge;
         if (bridge?.connection?.ws?.readyState === WebSocket.OPEN) {
-          bridge.connection.ws.close(4999);
+          prevConfig = state.config.retry;
+          state.config.retry = {
+            baseDelay: 1000 * 60 * 60, // One hour
+            backoff: false,
+            skipImmediate: true,
+          };
+          bridge.connection.ws.close();
         } else if (bridge?.connection) {
           bridge.reconnect();
         } else {

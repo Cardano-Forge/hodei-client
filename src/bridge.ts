@@ -25,8 +25,6 @@ export type BridgeConnection = {
 const CLOSE_CODES = {
   NormalClosure: 1000,
   SessionDeleted: 4001,
-  // Used to test connection lost states in dev
-  ArtificiallyHanged: 4999,
 };
 
 const WS_STATES: Record<number, string> = {
@@ -340,11 +338,6 @@ export class Bridge {
             deleteToken();
           }
 
-          if (event.code === CLOSE_CODES.ArtificiallyHanged) {
-            this.debugLog("Connection artificially hanged");
-            return;
-          }
-
           if (
             event.code !== CLOSE_CODES.NormalClosure &&
             event.code !== CLOSE_CODES.SessionDeleted
@@ -468,11 +461,16 @@ export class Bridge {
 
     this.connection.reconnection = reconnection;
 
-    let retries = 0;
-    let state: ConnectionState | undefined;
-
     const cfg =
       this.config.retry === true ? DEFAULT_RETRY_CONFIG : this.config.retry;
+
+    let state: ConnectionState | undefined;
+
+    let retries = 0;
+    if (cfg !== false && cfg.skipImmediate) {
+      this.debugLog("skipping immediate reconnect attempt");
+      retries = 1;
+    }
 
     do {
       let delay: number;
