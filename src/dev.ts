@@ -11,9 +11,8 @@ const devConfig: Config = {
     baseUrl: "http://localhost:8000",
   },
   retry: {
-    backoff: true,
-    baseDelay: 2000,
-    maxRetries: 3,
+    backoff: false,
+    baseDelay: 60000,
   },
   debug: true,
   onError: ({ error }) => {

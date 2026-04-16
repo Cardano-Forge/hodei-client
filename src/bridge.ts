@@ -5,6 +5,7 @@ import {
   type DeferredPromise,
   deferredPromise,
   getFailureReason,
+  debounce,
 } from "./utils";
 
 export type BridgeOpts = {
@@ -257,24 +258,6 @@ export class Bridge {
         events: this._connection?.events ?? new EventTarget(),
         reconnection: this._connection?.reconnection,
       };
-
-      // const reconnectWithDebounce = debounce(() => {
-      //   if (this.config.retry) {
-      //     this.debugLog("reconnecting");
-      //     this.reconnect();
-      //   } else {
-      //     this.debugLog("skipping reconnect: retrying is disabled");
-      //   }
-      // }, 500);
-
-      // const handleVisibilityChange = () => {
-      //   if (document.visibilityState === "visible") {
-      //     reconnectWithDebounce();
-      //   }
-      // };
-
-      // document.addEventListener("visibilityChange", handleVisibilityChange);
-      // window.addEventListener("focus", reconnectWithDebounce);
 
       this._connection = connection;
 
@@ -532,14 +515,27 @@ export class Bridge {
         clearTimeout(timer);
         deferred.resolve(undefined);
       };
+      const reconnectWithDebounce = debounce(() => {
+        this.debugLog("restarting connection process: window focused");
+        retries = -1;
+        handleAbort();
+      }, 250);
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === "visible") {
+          reconnectWithDebounce();
+        }
+      };
 
-      reconnection.signal.addEventListener("abort", handleAbort, {
-        once: true,
-      });
+      const c = { signal: reconnection.signal, once: true };
+      reconnection.signal.addEventListener("abort", handleAbort, c);
+      document.addEventListener("visibilityChange", handleVisibilityChange, c);
+      window.addEventListener("focus", reconnectWithDebounce, c);
 
       state = await deferred.promise.catch(() => undefined);
 
       reconnection.signal.removeEventListener("abort", handleAbort);
+      document.removeEventListener("visibilityChange", handleVisibilityChange);
+      window.removeEventListener("focus", reconnectWithDebounce);
 
       if (!state) {
         this.debugLog("reconnection attempt failed");
