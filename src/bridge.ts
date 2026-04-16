@@ -26,6 +26,14 @@ export type BridgeConnection = {
   subscriptions: Subscription[];
 };
 
+const CLOSE_CODES = {
+  NormalClosure: 1000,
+  SessionDeleted: 4001,
+  ConnectionStolen: 4002,
+  // Used to test connection lost states in dev
+  ArtificiallyHanged: 4999,
+};
+
 export class Bridge {
   readonly config: Config;
   private readonly _onStateChange: (state: BridgeState) => void;
@@ -89,7 +97,7 @@ export class Bridge {
   }
 
   private _shutdown(connection: BridgeConnection) {
-    connection.ws.close(1000, "disconnected");
+    connection.ws.close(CLOSE_CODES.NormalClosure, "disconnected");
     for (const sub of connection.subscriptions) {
       sub.unsubscribe();
     }
@@ -193,6 +201,16 @@ export class Bridge {
     );
 
     ws.addEventListener(
+      "close",
+      (event) => {
+        this.debugLog("ws closed while connecting");
+        deferred.reject(`Closed while connecting: ${getFailureReason(event)}`);
+        connectionController.abort();
+      },
+      { signal: connectionController.signal },
+    );
+
+    ws.addEventListener(
       "error",
       (event) => {
         this.debugLog("received connection error");
@@ -219,10 +237,10 @@ export class Bridge {
         subscriptions: [],
       };
 
-      const reconnect = debounce(() => {
+      const reconnectWithDebounce = debounce(() => {
         if (this.config.retry) {
           this.debugLog("reconnecting");
-          this.reconnectNow();
+          this.reconnect();
         } else {
           this.debugLog("skipping reconnect: retrying is disabled");
         }
@@ -230,12 +248,12 @@ export class Bridge {
 
       const handleVisibilityChange = () => {
         if (document.visibilityState === "visible") {
-          reconnect();
+          reconnectWithDebounce();
         }
       };
 
       document.addEventListener("visibilityChange", handleVisibilityChange);
-      window.addEventListener("focus", reconnect);
+      window.addEventListener("focus", reconnectWithDebounce);
 
       connection.subscriptions.push({
         unsubscribe: () => {
@@ -243,7 +261,7 @@ export class Bridge {
             "visibilityChange",
             handleVisibilityChange,
           );
-          window.removeEventListener("focus", reconnect);
+          window.removeEventListener("focus", reconnectWithDebounce);
         },
       });
 
@@ -302,7 +320,7 @@ export class Bridge {
       ws.addEventListener(
         "error",
         async (event) => {
-          if (await this._scheduleReconnect()) {
+          if (await this.reconnect()) {
             this.debugLog("scheduled reconnect after error");
             return;
           }
@@ -325,14 +343,22 @@ export class Bridge {
         "close",
         async (event) => {
           // Session deleted
-          if (event.code === 4001) {
+          if (event.code === CLOSE_CODES.SessionDeleted) {
             this.debugLog("session deleted");
             deleteToken();
           }
 
-          if (event.code !== 1000 && (await this._scheduleReconnect())) {
-            this.debugLog("reconnected after close");
+          if (event.code === CLOSE_CODES.ArtificiallyHanged) {
+            this.debugLog("Connection artificially hanged");
             return;
+          }
+
+          if (event.code !== CLOSE_CODES.NormalClosure) {
+            const state = await this.reconnect();
+            if (state) {
+              this.debugLog("reconnected after close");
+              return;
+            }
           }
 
           this.debugLog(`received close: ${event.code} ${event.reason}`);
@@ -349,8 +375,6 @@ export class Bridge {
         },
         { signal: connection.controller.signal },
       );
-
-      this._attempts = 0;
 
       return state;
     } catch (error) {
@@ -415,95 +439,62 @@ export class Bridge {
     return deferred.promise;
   }
 
-  async reconnectNow(): Promise<ConnectionState> {
-    if (
-      this.isConnected() &&
-      this.connection?.ws.readyState === WebSocket.OPEN
-    ) {
-      this.debugLog("skipping reconnect, socket is connected");
-      return this.connection.state;
-    }
+  // // TODO handle cancellations
+  // private _reconnectionState:
+  //   | {
+  //       timer: number;
+  //     }
+  //   | undefined;
 
-    if (this._reconnectTimer) {
-      this.debugLog("clearing reconnect timer");
-      clearTimeout(this._reconnectTimer);
-    }
+  async reconnect(): Promise<ConnectionState | undefined> {
+    let retries = 0;
+    let state: ConnectionState | undefined;
 
-    this.debugLog("reconnecting now");
-    this._reconnectTimer = undefined;
+    const cfg =
+      this.config.retry === true ? DEFAULT_RETRY_CONFIG : this.config.retry;
 
-    return this._connect();
-  }
-
-  private _attempts = 0;
-
-  // TODO i don't think this is good anymore
-  private _reconnectTimer?: number;
-
-  private async _scheduleReconnect(): Promise<ConnectionState | undefined> {
-    if (this._reconnectTimer) {
-      this.debugLog("clearing reconnect timer");
-      clearTimeout(this._reconnectTimer);
-    }
-
-    let cfg = this.config.retry;
-
-    if (!cfg) {
-      this.debugLog("skipping retry because retrying has been disabled.");
-      return undefined;
-    }
-
-    if (cfg === true) {
-      cfg = DEFAULT_RETRY_CONFIG;
-    }
-
-    if (this._attempts >= (cfg.maxRetries ?? Number.POSITIVE_INFINITY)) {
-      this.debugLog(`reached maximum of ${cfg.maxRetries} retries, stopping.`);
-      return undefined;
-    }
-
-    const baseDelay = Math.max(0, cfg.baseDelay);
-
-    let delay: number;
-    if (this._attempts === 0) {
-      delay = 0;
-    } else if (cfg.backoff) {
-      delay = baseDelay * 2 ** (this._attempts - 1);
-    } else {
-      delay = baseDelay;
-    }
-
-    if (cfg.maxDelay) {
-      delay = Math.min(delay, cfg.maxDelay);
-    }
-
-    this.debugLog(`reconnecting in ${delay / 1000}s`);
-
-    this._attempts += 1;
-
-    if (delay <= 0) {
-      return this.reconnectNow().catch(() => this._scheduleReconnect());
-    }
-
-    const deferred = deferredPromise<ConnectionState | undefined>();
-
-    const timer = setTimeout(async () => {
-      try {
-        console.log("RECONNECTION NOW");
-        const state = await this.reconnectNow();
-        console.log("RECONNECTION WORKED");
-        deferred.resolve(state);
-      } catch {
-        console.log("RECONNECTION FAILED. SCHEDULING AGAIN");
-        const maybeState = await this._scheduleReconnect();
-        console.log("SCHEDULED RECONNECTION WORKED");
-        deferred.resolve(maybeState);
+    do {
+      let delay: number;
+      if (!cfg || retries === 0) {
+        delay = 0;
+      } else {
+        const baseDelay = Math.max(0, cfg.baseDelay);
+        if (cfg.backoff) {
+          delay = baseDelay * 2 ** (retries - 1);
+        } else {
+          delay = baseDelay;
+        }
+        if (cfg.maxDelay) {
+          delay = Math.min(delay, cfg.maxDelay);
+        }
       }
-    }, delay);
 
-    this._reconnectTimer = timer;
+      const deferred = deferredPromise<ConnectionState | undefined>();
 
-    return deferred.promise;
+      setTimeout(async () => {
+        if (
+          this.isConnected() &&
+          this.connection?.ws.readyState === WebSocket.OPEN
+        ) {
+          deferred.resolve(this.connection.state);
+          return;
+        }
+        try {
+          const s = await this._connect();
+          deferred.resolve(s);
+        } catch (error) {
+          deferred.reject(error);
+        }
+      }, delay);
+
+      state = await deferred.promise.catch(() => undefined);
+    } while (
+      !state &&
+      cfg &&
+      retries++ < (cfg.maxRetries ?? Number.POSITIVE_INFINITY)
+    );
+
+    return state;
   }
 
   private async _getToken(): Promise<string | undefined> {

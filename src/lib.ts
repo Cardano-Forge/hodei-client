@@ -153,24 +153,14 @@ export function createInitialWalletApi(
 
   if (import.meta.env.MODE === "development") {
     initialApi.dev = {
-      toggleWs: () => {
-        const bridge = state.resolved?.bridge;
-
-        if (!bridge?.connection) {
-          console.log(
-            "[DEV] can't toggle ws connection: bridge is not connected",
-          );
-          return;
-        }
-
-        if (bridge.connection.ws.readyState === WebSocket.OPEN) {
-          console.log("[DEV] closing ws connection and disabling retry");
-          state.config.retry = false;
-          bridge.connection.ws.close();
+      hang: () => {
+        const ws = state.resolved?.bridge?.connection?.ws;
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.close(4999);
         } else {
-          console.log("[DEV] reconnecting and enabling retry");
-          state.config.retry = true;
-          bridge.reconnectNow();
+          console.log(
+            "[DEV] can't hang ws connection: bridge is not connected",
+          );
         }
       },
       unlink: () => state.resolved?.bridge.unlink(),

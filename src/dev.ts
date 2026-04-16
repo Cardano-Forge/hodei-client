@@ -54,8 +54,8 @@ window.onkeydown = (event) => {
     fn = signDataStake;
   } else if (event.key === "P") {
     fn = signDataPayment;
-  } else if (event.key === "L") {
-    fn = loseConnection;
+  } else if (event.key === "H") {
+    fn = hang;
   } else if (event.key === "D") {
     fn = disconnect;
   } else if (event.key === "U") {
@@ -81,14 +81,12 @@ document
 document
   .querySelector("#signDataPayment")
   ?.addEventListener("click", signDataPayment);
-document
-  .querySelector("#loseConnection")
-  ?.addEventListener("click", loseConnection);
+document.querySelector("#hang")?.addEventListener("click", hang);
 document.querySelector("#disconnect")?.addEventListener("click", disconnect);
 
 // Functions
-function loseConnection() {
-  getDevApi()?.toggleWs();
+function hang() {
+  getDevApi()?.hang();
 }
 
 async function connect() {
@@ -284,7 +282,7 @@ async function delegate() {
 
 export type DevInitialWalletApi = InitialWalletApi & {
   dev?: {
-    toggleWs(): void;
+    hang(): void;
     unlink(): void;
     disconnect(): void;
   };
