@@ -62,12 +62,13 @@ export function hasProperty<P extends string>(
 export function debounce(fn: () => void, delay: number) {
   let timer: number | undefined;
   return () => {
-    if (!timer) {
-      timer = setTimeout(() => {
-        fn();
-        timer = undefined;
-      }, delay);
+    if (timer) {
+      clearTimeout(timer);
     }
+    timer = setTimeout(() => {
+      fn();
+      timer = undefined;
+    }, delay);
   };
 }
 

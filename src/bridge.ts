@@ -527,13 +527,13 @@ export class Bridge {
 
       const c = { signal: reconnection.signal, once: true };
       reconnection.signal.addEventListener("abort", handleAbort, c);
-      document.addEventListener("visibilityChange", handleVisibilityChange, c);
+      document.addEventListener("visibilitychange", handleVisibilityChange, c);
       window.addEventListener("focus", reconnectWithDebounce, c);
 
       state = await deferred.promise.catch(() => undefined);
 
       reconnection.signal.removeEventListener("abort", handleAbort);
-      document.removeEventListener("visibilityChange", handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", reconnectWithDebounce);
 
       if (!state) {
