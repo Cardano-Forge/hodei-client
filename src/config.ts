@@ -22,11 +22,11 @@ export type Config = {
 };
 
 export type RetryConfig = {
-  /** Maximum number of retries */
+  /** Maximum number of retries (default: undefined - infinity) */
   maxRetries?: number;
-  /** Base delay in milliseconds between retries */
+  /** Base delay in milliseconds between retries (default: 2000 - 2 seconds) */
   baseDelay: number;
-  /** Maximum delay in milliseconds between retries */
+  /** Maximum delay in milliseconds between retries (default: 32_000 - 32 seconds) */
   maxDelay?: number;
   /** Use exponential backoff (default: true) */
   backoff?: boolean;

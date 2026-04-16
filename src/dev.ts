@@ -10,6 +10,10 @@ const devConfig: Config = {
     ...DEFAULT_CONFIG.bridge,
     baseUrl: "http://localhost:8000",
   },
+  retry: {
+    baseDelay: 2000,
+    maxRetries: 3,
+  },
   debug: true,
   onError: ({ error }) => {
     updateWalletState({ status: "error", error: error ?? "unknown" });

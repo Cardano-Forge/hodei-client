@@ -330,8 +330,8 @@ export class Bridge {
             deleteToken();
           }
 
-          if (event.code !== 1000 && this._scheduleReconnect()) {
-            this.debugLog("scheduled reconnect after close");
+          if (event.code !== 1000 && (await this._scheduleReconnect())) {
+            this.debugLog("reconnected after close");
             return;
           }
 
@@ -431,12 +431,16 @@ export class Bridge {
 
     this.debugLog("reconnecting now");
     this._reconnectTimer = undefined;
+
     return this._connect();
   }
 
   private _attempts = 0;
+
+  // TODO i don't think this is good anymore
   private _reconnectTimer?: number;
-  private _scheduleReconnect(): boolean {
+
+  private async _scheduleReconnect(): Promise<ConnectionState | undefined> {
     if (this._reconnectTimer) {
       this.debugLog("clearing reconnect timer");
       clearTimeout(this._reconnectTimer);
@@ -446,7 +450,7 @@ export class Bridge {
 
     if (!cfg) {
       this.debugLog("skipping retry because retrying has been disabled.");
-      return false;
+      return undefined;
     }
 
     if (cfg === true) {
@@ -455,7 +459,7 @@ export class Bridge {
 
     if (this._attempts >= (cfg.maxRetries ?? Number.POSITIVE_INFINITY)) {
       this.debugLog(`reached maximum of ${cfg.maxRetries} retries, stopping.`);
-      return false;
+      return undefined;
     }
 
     const baseDelay = Math.max(0, cfg.baseDelay);
@@ -475,16 +479,29 @@ export class Bridge {
 
     this._attempts += 1;
 
-    if (delay > 0) {
-      const timer = setTimeout(() => {
-        this.reconnectNow().catch(() => this._scheduleReconnect());
-      }, delay);
-      this._reconnectTimer = timer;
-    } else {
-      this.reconnectNow().catch(() => this._scheduleReconnect());
+    if (delay <= 0) {
+      return this.reconnectNow().catch(() => this._scheduleReconnect());
     }
 
-    return true;
+    const deferred = deferredPromise<ConnectionState | undefined>();
+
+    const timer = setTimeout(async () => {
+      try {
+        console.log("RECONNECTION NOW");
+        const state = await this.reconnectNow();
+        console.log("RECONNECTION WORKED");
+        deferred.resolve(state);
+      } catch {
+        console.log("RECONNECTION FAILED. SCHEDULING AGAIN");
+        const maybeState = await this._scheduleReconnect();
+        console.log("SCHEDULED RECONNECTION WORKED");
+        deferred.resolve(maybeState);
+      }
+    }, delay);
+
+    this._reconnectTimer = timer;
+
+    return deferred.promise;
   }
 
   private async _getToken(): Promise<string | undefined> {
