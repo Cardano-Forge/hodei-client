@@ -2,6 +2,7 @@ import { submitTx } from "./anvil";
 import type { EnabledWalletApi, InitialWalletApi } from "./api";
 import { type Config, DEFAULT_CONFIG } from "./config";
 import { initialize } from "./lib";
+import { assert } from "./utils";
 
 const devConfig: Config = {
   ...DEFAULT_CONFIG,
@@ -9,16 +10,34 @@ const devConfig: Config = {
     ...DEFAULT_CONFIG.bridge,
     baseUrl: "http://localhost:8000",
   },
+  retry: {
+    backoff: false,
+    baseDelay: 60000,
+  },
   debug: true,
-  onError: ({ error }) => console.log("socket error:", error ?? "unknown"),
-  onClose: ({ code, reason }) => console.log("socket closed:", code, reason),
-  onWalletUpdate: (wallet) => console.log("wallet update", wallet),
+  onError: ({ error }) => {
+    updateWalletState({ status: "error", error: error ?? "unknown" });
+  },
+  onClose: ({ code, reason }) => {
+    updateWalletState({ status: "closed", code, reason });
+  },
+  onWalletUpdate: (wallet) => {
+    updateWalletState({ status: "connected", ...wallet });
+  },
   waitForPairing: true,
 };
+
+function updateWalletState(state: unknown) {
+  const el = document.querySelector("#walletState");
+  assert(el);
+  el.innerHTML = JSON.stringify(state, null, 2);
+}
 
 initialize(devConfig);
 
 let wallet: EnabledWalletApi | undefined;
+
+connect();
 
 // Kbd shortcuts
 window.onkeydown = (event) => {
@@ -34,12 +53,16 @@ window.onkeydown = (event) => {
     fn = signDataStake;
   } else if (event.key === "P") {
     fn = signDataPayment;
-  } else if (event.key === "L") {
-    fn = loseConnection;
+  } else if (event.key === "H") {
+    fn = hang;
   } else if (event.key === "D") {
     fn = disconnect;
   } else if (event.key === "U") {
     fn = unlink;
+  } else if (event.key === "B") {
+    fn = debug;
+  } else if (event.key === "K") {
+    fn = clearConsole;
   }
 
   if (fn) {
@@ -59,14 +82,17 @@ document
 document
   .querySelector("#signDataPayment")
   ?.addEventListener("click", signDataPayment);
-document
-  .querySelector("#loseConnection")
-  ?.addEventListener("click", loseConnection);
+document.querySelector("#hang")?.addEventListener("click", hang);
+document.querySelector("#debug")?.addEventListener("click", debug);
 document.querySelector("#disconnect")?.addEventListener("click", disconnect);
 
 // Functions
-function loseConnection() {
-  getDevApi()?.closeWs();
+function hang() {
+  getDevApi()?.hang();
+}
+
+function debug() {
+  getDevApi()?.debug();
 }
 
 async function connect() {
@@ -85,6 +111,10 @@ async function disconnect() {
 
 async function unlink() {
   getDevApi()?.unlink();
+}
+
+async function clearConsole() {
+  console.clear();
 }
 
 async function signDataStake() {
@@ -258,7 +288,8 @@ async function delegate() {
 
 export type DevInitialWalletApi = InitialWalletApi & {
   dev?: {
-    closeWs(): void;
+    hang(): void;
+    debug(): void;
     unlink(): void;
     disconnect(): void;
   };

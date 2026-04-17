@@ -1,4 +1,14 @@
-export function deferredPromise<T = void, R = unknown>() {
+export type DeferredPromise<T, R> = {
+  status: "pending";
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: R) => void;
+};
+
+export function deferredPromise<T = void, R = unknown>(): DeferredPromise<
+  T,
+  R
+> {
   let status: "pending" | "resolved" | "rejected" = "pending";
   let resolve: (value: T | PromiseLike<T>) => void = () => undefined;
   let reject: (reason?: R) => void = () => undefined;
@@ -52,11 +62,24 @@ export function hasProperty<P extends string>(
 export function debounce(fn: () => void, delay: number) {
   let timer: number | undefined;
   return () => {
-    if (!timer) {
-      timer = setTimeout(() => {
-        fn();
-        timer = undefined;
-      }, delay);
+    if (timer) {
+      clearTimeout(timer);
     }
+    timer = setTimeout(() => {
+      fn();
+      timer = undefined;
+    }, delay);
   };
+}
+
+export function assert(
+  condition: unknown,
+  explanation?: string,
+): asserts condition {
+  if (condition) {
+    return;
+  }
+  let msg = "Assertion failed";
+  if (explanation) msg += `: ${explanation}`;
+  throw new Error(msg);
 }

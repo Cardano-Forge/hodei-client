@@ -2,15 +2,13 @@ import { getBalance, getUtxos, submitTx } from "./anvil";
 import type { DataSignature, EnabledWalletApi, InitialWalletApi } from "./api";
 import {
   assertIncomingMessage,
-  assertSigReqResponse,
   Bridge,
   type BridgeOpts,
   type BridgeState,
   checkToken,
-  type SigReqCreatedMessage,
 } from "./bridge";
 import { addCommandListener, type Command, sendCommand } from "./command";
-import { type Config, DEFAULT_CONFIG } from "./config";
+import { type Config, DEFAULT_CONFIG, type RetryConfig } from "./config";
 import type { DevInitialWalletApi } from "./dev";
 import {
   createApiError,
@@ -97,6 +95,10 @@ export function createInitialWalletApi(
         return state.resolved.api;
       }
 
+      if (!state.promise && state.resolved) {
+        state.promise = enable(state.resolved.bridge);
+      }
+
       if (!state.promise) {
         state.promise = enable({
           config: state.config,
@@ -150,8 +152,31 @@ export function createInitialWalletApi(
   };
 
   if (import.meta.env.MODE === "development") {
+    let prevConfig: RetryConfig | boolean | undefined;
     initialApi.dev = {
-      closeWs: () => state.resolved?.bridge.connection?.ws?.close(),
+      hang: () => {
+        if (prevConfig) {
+          state.config.retry = prevConfig;
+          prevConfig = undefined;
+        }
+        const bridge = state.resolved?.bridge;
+        if (bridge?.connection?.ws?.readyState === WebSocket.OPEN) {
+          prevConfig = state.config.retry;
+          state.config.retry = {
+            baseDelay: 1000 * 60 * 60, // One hour
+            backoff: false,
+            skipImmediate: true,
+          };
+          bridge.connection.ws.close();
+        } else if (bridge?.connection) {
+          bridge.reconnect();
+        } else {
+          console.log(
+            "[DEV] can't hang ws connection: bridge is not connected",
+          );
+        }
+      },
+      debug: () => state.resolved?.bridge.debugLogState(),
       unlink: () => state.resolved?.bridge.unlink(),
       disconnect: () => state.resolved?.bridge.disconnect(),
     };
@@ -167,10 +192,10 @@ type EnableOutput = {
   pairingPromise: Promise<void>;
 };
 
-async function enable(input: BridgeOpts): Promise<EnableOutput> {
+async function enable(input: Bridge | BridgeOpts): Promise<EnableOutput> {
   const client = await mountClient();
 
-  const bridge = new Bridge(input);
+  const bridge = input instanceof Bridge ? input : new Bridge(input);
 
   await bridge.connect();
 
@@ -214,78 +239,13 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
     return bridgeState;
   };
 
-  const handleSigReq = async (
-    payload: SigReqCreatedMessage["payload"],
-  ): Promise<string> => {
-    ensurePaired();
-
-    if (!bridge.isConnected()) {
-      throw createApiError("refused", new Error("Wallet is not connected"));
-    }
-
-    const controller = new AbortController();
-
-    bridge.connection.controller.signal.addEventListener(
-      "abort",
-      () => controller.abort(),
-      { signal: controller.signal },
-    );
-
-    const deferred = deferredPromise<string>();
-
-    controller.signal.addEventListener("abort", () => {
-      deferred.reject("aborted");
-    });
-
-    bridge.connection.events.addEventListener(
-      "message",
-      (event) => {
-        if (!(event instanceof CustomEvent)) {
-          return;
-        }
-        try {
-          const message = event.detail;
-          assertSigReqResponse(message);
-          if (message.payload.requestId !== payload.requestId) {
-            return;
-          }
-
-          bridge.send({
-            type: "client.sig_req_ack",
-            payload: { requestId: message.payload.requestId },
-          });
-
-          if (message.type === "client.sig_req_accepted") {
-            deferred.resolve(message.payload.signature);
-          } else {
-            deferred.reject(message.payload.reason);
-          }
-
-          controller.abort();
-        } catch (error) {
-          bridge.debugLog(
-            `error parsing message ${event.detail}: ${getFailureReason(error)}`,
-          );
-        }
-      },
-      { signal: controller.signal },
-    );
-
-    bridge.send({
-      type: "client.sig_req_created",
-      payload: payload,
-    });
-
-    return deferred.promise;
-  };
-
   const api: EnabledWalletApi = {
     getNetworkId: async () => (ensurePaired().network === "mainnet" ? 1 : 0),
     getUtxos: async () => {
       const bridgeState = ensurePaired();
       try {
         const utxos = await getUtxos({
-          config: input.config,
+          config: bridge.config,
           network: bridgeState.network,
           address: bridgeState.baseAddress,
         });
@@ -299,7 +259,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       const bridgeState = ensurePaired();
       try {
         const balance = await getBalance({
-          config: input.config,
+          config: bridge.config,
           network: bridgeState.network,
           address: bridgeState.baseAddress,
         });
@@ -326,7 +286,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
     },
     signTx: async (tx, partialSign = false) => {
       try {
-        return await handleSigReq({
+        return await bridge.handleSigReq({
           requestId: crypto.randomUUID(),
           tx,
           partialSign,
@@ -341,7 +301,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       }
     },
     signData: async (address, data) => {
-      const res = await handleSigReq({
+      const res = await bridge.handleSigReq({
         requestId: crypto.randomUUID(),
         address,
         data,
@@ -362,7 +322,7 @@ async function enable(input: BridgeOpts): Promise<EnableOutput> {
       const bridgeState = ensurePaired();
       try {
         const res = await submitTx({
-          config: input.config,
+          config: bridge.config,
           network: bridgeState.network,
           transaction,
         });

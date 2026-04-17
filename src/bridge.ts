@@ -1,14 +1,16 @@
-import type { Config } from "./config";
+import { type Config, DEFAULT_RETRY_CONFIG } from "./config";
+import { createApiError } from "./error";
 import { deleteToken, getToken, setToken } from "./storage";
-import { debounce, deferredPromise, getFailureReason } from "./utils";
+import {
+  type DeferredPromise,
+  debounce,
+  deferredPromise,
+  getFailureReason,
+} from "./utils";
 
 export type BridgeOpts = {
   config: Config;
   onStateChange(state: BridgeState): void;
-};
-
-type Subscription = {
-  unsubscribe: () => void;
 };
 
 export type BridgeConnection = {
@@ -16,20 +18,34 @@ export type BridgeConnection = {
   ws: WebSocket;
   state: BridgeState;
   controller: AbortController;
+  reconnection: AbortController | undefined;
   events: EventTarget;
-  subscriptions: Subscription[];
+};
+
+const CLOSE_CODES = {
+  NormalClosure: 1000,
+  SessionDeleted: 4001,
+};
+
+const WS_STATES: Record<number, string> = {
+  [WebSocket.CONNECTING]: "connecting",
+  [WebSocket.OPEN]: "open",
+  [WebSocket.CLOSING]: "closing",
+  [WebSocket.CLOSED]: "closed",
 };
 
 export class Bridge {
-  private readonly _config: Config;
+  readonly config: Config;
   private readonly _onStateChange: (state: BridgeState) => void;
   private _debug: boolean;
+
+  private _sigReqPromises = new Map<string, DeferredPromise<string, string>>();
 
   private _connectPromise: Promise<ConnectionState> | undefined;
   private _connection?: BridgeConnection;
 
   constructor(opts: BridgeOpts) {
-    this._config = opts.config;
+    this.config = opts.config;
     this._onStateChange = opts.onStateChange;
     this._debug = opts.config?.debug ?? false;
   }
@@ -49,6 +65,33 @@ export class Bridge {
     }
 
     console.log(header, ...args);
+  }
+
+  debugLogState() {
+    this.debugLog(
+      JSON.stringify(
+        {
+          isConnected: this.isConnected(),
+          connection: this.connection
+            ? {
+                id: this.connection.id,
+                ws: WS_STATES[this.connection.ws.readyState],
+                state: this.connection.state,
+                controller: {
+                  aborted: this.connection.controller.signal.aborted,
+                },
+                reconnection: {
+                  status: this.connection.reconnection ? "active" : "inactive",
+                  aborted: this.connection.reconnection?.signal.aborted,
+                },
+              }
+            : undefined,
+          sigReqPromises: Array.from(this._sigReqPromises.keys()),
+        },
+        null,
+        2,
+      ),
+    );
   }
 
   get connection(): BridgeConnection | undefined {
@@ -71,6 +114,7 @@ export class Bridge {
       return this.connection.state;
     }
 
+    this._connection?.ws.close(CLOSE_CODES.NormalClosure, "reconnecting");
     this._connectPromise = this._connect();
 
     try {
@@ -80,18 +124,11 @@ export class Bridge {
     }
   }
 
-  private _shutdown(connection: BridgeConnection) {
-    connection.ws.close(1000, "disconnected");
-    for (const sub of connection.subscriptions) {
-      sub.unsubscribe();
-    }
-  }
-
   disconnect(): void {
-    if (this._connection) {
-      this._shutdown(this._connection);
-      this._connection = undefined;
-    }
+    this.debugLog("disconnecting");
+    this._connection?.reconnection?.abort("disconnecting");
+    this._connection?.ws.close(CLOSE_CODES.NormalClosure, "disconnected");
+    this._connection = undefined;
   }
 
   unlink(): void {
@@ -103,11 +140,9 @@ export class Bridge {
   }
 
   private async _connect(): Promise<ConnectionState> {
-    if (this._connection) {
-      this._shutdown(this._connection);
-    }
+    this._connection?.ws.close(CLOSE_CODES.NormalClosure, "reconnecting");
 
-    const baseUrl = this._config.bridge.baseUrl.replace("http", "ws");
+    const baseUrl = this.config.bridge.baseUrl.replace("http", "ws");
     const url = new URL(`${baseUrl}/client/ws`);
 
     const token = await this._getToken();
@@ -129,6 +164,49 @@ export class Bridge {
           const json = JSON.parse(event.data);
           assertConnectedMessage(json);
           this.debugLog("received connection message");
+
+          if (
+            json.payload.status === "paired" &&
+            this._sigReqPromises.size > 0
+          ) {
+            const updatedPromises: typeof this._sigReqPromises = new Map();
+            for (const resp of json.payload.sigReqs ?? []) {
+              const deferred = this._sigReqPromises.get(resp.requestId);
+              if (!deferred) {
+                continue;
+              }
+
+              this._sigReqPromises.delete(resp.requestId);
+
+              if (!resp.response) {
+                updatedPromises.set(resp.requestId, deferred);
+                continue;
+              }
+
+              ws.send(
+                JSON.stringify({
+                  type: "client.sig_req_ack",
+                  payload: {
+                    vaultId: json.payload.vaultId,
+                    requestId: resp.requestId,
+                  },
+                }),
+              );
+
+              if (resp.response.status === "accepted") {
+                deferred.resolve(resp.response.data);
+              } else {
+                deferred.reject(resp.response.data);
+              }
+            }
+
+            for (const deferred of this._sigReqPromises.values()) {
+              deferred.reject("request expired");
+            }
+
+            this._sigReqPromises = updatedPromises;
+          }
+
           deferred.resolve(json.payload);
         } catch (error) {
           deferred.reject(
@@ -137,6 +215,16 @@ export class Bridge {
         } finally {
           connectionController.abort();
         }
+      },
+      { signal: connectionController.signal },
+    );
+
+    ws.addEventListener(
+      "close",
+      (event) => {
+        this.debugLog("ws closed while connecting");
+        deferred.reject(`Closed while connecting: ${getFailureReason(event)}`);
+        connectionController.abort();
       },
       { signal: connectionController.signal },
     );
@@ -162,35 +250,11 @@ export class Bridge {
         id: connectionId,
         ws,
         state: state as BridgeState,
+        controller: new AbortController(),
         // Keep stable references so that event listeners keep working
-        controller: this._connection?.controller ?? new AbortController(),
         events: this._connection?.events ?? new EventTarget(),
-        subscriptions: [],
+        reconnection: this._connection?.reconnection,
       };
-
-      const reconnect = debounce(() => {
-        this.debugLog("reconnecting");
-        this._reconnectNow();
-      }, 500);
-
-      const handleVisibilityChange = () => {
-        if (document.visibilityState === "visible") {
-          reconnect();
-        }
-      };
-
-      document.addEventListener("visibilitychange", handleVisibilityChange);
-      window.addEventListener("focus", reconnect);
-
-      connection.subscriptions.push({
-        unsubscribe: () => {
-          window.removeEventListener(
-            "visibilityChange",
-            handleVisibilityChange,
-          );
-          window.removeEventListener("focus", reconnect);
-        },
-      });
 
       this._connection = connection;
 
@@ -210,6 +274,8 @@ export class Bridge {
 
             const json = JSON.parse(event.data);
             assertIncomingMessage(json);
+
+            this.debugLog("received message", json);
 
             this._connection?.events.dispatchEvent(
               new CustomEvent("message", {
@@ -244,8 +310,8 @@ export class Bridge {
 
       ws.addEventListener(
         "error",
-        (event) => {
-          if (this._scheduleReconnect()) {
+        async (event) => {
+          if (await this.reconnect()) {
             this.debugLog("scheduled reconnect after error");
             return;
           }
@@ -259,7 +325,7 @@ export class Bridge {
 
           this._onStateChange(connection.state);
 
-          connection.controller.abort();
+          connection.controller.abort("socket error");
         },
         { signal: connection.controller.signal },
       );
@@ -267,15 +333,20 @@ export class Bridge {
       ws.addEventListener(
         "close",
         async (event) => {
-          // Session deleted
-          if (event.code === 4001) {
+          if (event.code === CLOSE_CODES.SessionDeleted) {
             this.debugLog("session deleted");
             deleteToken();
           }
 
-          if (event.code !== 1000 && this._scheduleReconnect()) {
-            this.debugLog("scheduled reconnect after close");
-            return;
+          if (
+            event.code !== CLOSE_CODES.NormalClosure &&
+            event.code !== CLOSE_CODES.SessionDeleted
+          ) {
+            const state = await this.reconnect();
+            if (state) {
+              this.debugLog("reconnected after close");
+              return;
+            }
           }
 
           this.debugLog(`received close: ${event.code} ${event.reason}`);
@@ -288,12 +359,10 @@ export class Bridge {
 
           this._onStateChange(connection.state);
 
-          connection.controller.abort();
+          connection.controller.abort("socket closed");
         },
         { signal: connection.controller.signal },
       );
-
-      this._attempts = 0;
 
       return state;
     } catch (error) {
@@ -306,55 +375,193 @@ export class Bridge {
     this.connection?.ws.send(JSON.stringify(message));
   }
 
-  private _attempts = 0;
-  private _reconnectTimer?: number;
-  private _scheduleReconnect(): boolean {
-    if (this._reconnectTimer) {
-      this.debugLog("clearing reconnect timer");
-      clearTimeout(this._reconnectTimer);
+  handleSigReq(payload: SigReqCreatedMessage["payload"]): Promise<string> {
+    if (!this.isConnected()) {
+      throw createApiError("refused", new Error("Wallet is not connected"));
     }
 
-    this._attempts = Math.min(this._attempts + 1, 5);
-    const delay = 2 ** this._attempts * 1000;
-    this.debugLog(`reconnecting in ${delay / 1000}s`);
+    const deferred = deferredPromise<string>();
 
-    const timer = setTimeout(() => {
-      if (this._reconnectTimer !== timer) {
-        this.debugLog("reconnect timer cleared. ignoring");
+    this._sigReqPromises.set(payload.requestId, deferred);
+
+    this.connection.events.addEventListener("message", (event) => {
+      if (!(event instanceof CustomEvent)) {
         return;
       }
+      try {
+        const message = event.detail;
+        assertSigReqResponse(message);
+        if (message.payload.requestId !== payload.requestId) {
+          return;
+        }
 
-      if (this.connection?.ws.readyState === WebSocket.OPEN) {
-        this.debugLog("skipping reconnect, socket is connected");
-        return;
+        this._sigReqPromises.delete(payload.requestId);
+
+        if (this.connection.state.status === "paired") {
+          this.send({
+            type: "client.sig_req_ack",
+            payload: {
+              vaultId: this.connection.state.vaultId,
+              requestId: payload.requestId,
+            },
+          });
+        }
+
+        if (message.type === "client.sig_req_accepted") {
+          deferred.resolve(message.payload.signature);
+        } else {
+          deferred.reject(message.payload.reason);
+        }
+      } catch (error) {
+        this.debugLog(
+          `error parsing message ${event.detail}: ${getFailureReason(error)}`,
+        );
       }
+    });
 
-      this.debugLog("reconnecting");
-      this._reconnectTimer = undefined;
-      this._connect().catch(() => this._scheduleReconnect());
-    }, delay);
+    this.send({
+      type: "client.sig_req_created",
+      payload: payload,
+    });
 
-    this._reconnectTimer = timer;
-
-    return true;
+    return deferred.promise;
   }
 
-  private _reconnectNow() {
-    if (this.connection?.ws.readyState === WebSocket.OPEN) {
-      this.debugLog("skipping reconnect, socket is connected");
-      return;
+  async reconnect(): Promise<ConnectionState | undefined> {
+    if (!this.isConnected()) {
+      this.debugLog("failed to reconnect: not connected");
+      return undefined;
     }
 
-    if (this._reconnectTimer) {
-      this.debugLog("clearing reconnect timer");
-      clearTimeout(this._reconnectTimer);
+    this.connection.reconnection?.abort("reconnection was re-triggered");
+
+    const reconnection = new AbortController();
+
+    reconnection.signal.addEventListener(
+      "abort",
+      () => {
+        this.debugLog("reconnection aborted:", reconnection.signal.reason);
+        if (this.connection.reconnection === reconnection) {
+          this.debugLog("clearing reconnection");
+          this.connection.reconnection = undefined;
+        } else {
+          this.debugLog("clearing reconnection");
+        }
+      },
+      { once: true },
+    );
+
+    this.connection.controller.signal.addEventListener(
+      "abort",
+      // When the parent connection is aborted, cancel the reconnection attempt
+      () => reconnection.abort("parent connection aborted"),
+      // When the reconnection is aborted, stop listening on the parent connection controller
+      { signal: reconnection.signal },
+    );
+
+    this.connection.reconnection = reconnection;
+
+    const cfg =
+      this.config.retry === true ? DEFAULT_RETRY_CONFIG : this.config.retry;
+
+    let state: ConnectionState | undefined;
+
+    let retries = 0;
+    if (cfg !== false && cfg.skipImmediate) {
+      this.debugLog("skipping immediate reconnect attempt");
+      retries = 1;
     }
 
-    this.debugLog("reconnecting now");
-    this._reconnectTimer = undefined;
-    this._connect().catch(() => this._scheduleReconnect());
+    do {
+      let delay: number;
+      if (!cfg || retries === 0) {
+        delay = 0;
+      } else {
+        const baseDelay = Math.max(0, cfg.baseDelay);
+        if (cfg.backoff) {
+          delay = baseDelay * 2 ** (retries - 1);
+        } else {
+          delay = baseDelay;
+        }
+        if (cfg.maxDelay) {
+          delay = Math.min(delay, cfg.maxDelay);
+        }
+      }
 
-    return true;
+      if (retries > 0) {
+        this.debugLog(`next attempt in ${delay / 1000} seconds`);
+      }
+
+      const deferred = deferredPromise<ConnectionState | undefined>();
+
+      const timer = setTimeout(async () => {
+        if (
+          this.isConnected() &&
+          this.connection?.ws.readyState === WebSocket.OPEN
+        ) {
+          deferred.resolve(this.connection.state);
+          return;
+        }
+        try {
+          const s = await this._connect();
+          deferred.resolve(s);
+        } catch (error) {
+          deferred.reject(error);
+        }
+      }, delay);
+
+      const handleAbort = () => {
+        clearTimeout(timer);
+        deferred.resolve(undefined);
+      };
+      const reconnectWithDebounce = debounce(() => {
+        this.debugLog("restarting connection process: window focused");
+        retries = -1;
+        handleAbort();
+      }, 250);
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === "visible") {
+          reconnectWithDebounce();
+        }
+      };
+
+      const c = { signal: reconnection.signal, once: true };
+      reconnection.signal.addEventListener("abort", handleAbort, c);
+      document.addEventListener("visibilitychange", handleVisibilityChange, c);
+      window.addEventListener("focus", reconnectWithDebounce, c);
+
+      state = await deferred.promise.catch(() => undefined);
+
+      reconnection.signal.removeEventListener("abort", handleAbort);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", reconnectWithDebounce);
+
+      if (!state) {
+        this.debugLog("reconnection attempt failed");
+      }
+    } while (
+      !reconnection.signal.aborted &&
+      !state &&
+      cfg &&
+      retries++ < (cfg.maxRetries ?? Number.POSITIVE_INFINITY)
+    );
+
+    // When reconnection is aborted, we want to act as if reconnection failed even if it didn't
+    if (reconnection.signal.aborted) {
+      this.debugLog("reconnection was aborted, cancelling reconnection");
+      return undefined;
+    }
+
+    // Trigger reconnection cleanup
+    reconnection.abort("done");
+
+    if (state) {
+      this.debugLog("reconnection successful");
+    } else {
+      this.debugLog("reconnection failed");
+    }
+
+    return state;
   }
 
   private async _getToken(): Promise<string | undefined> {
@@ -363,7 +570,7 @@ export class Bridge {
       return undefined;
     }
 
-    const checked = await checkToken({ config: this._config, token });
+    const checked = await checkToken({ config: this.config, token });
 
     this.debugLog(
       `checked token: ${checked.valid ? "valid" : `invalid: ${checked.reason}`}`,
@@ -426,6 +633,7 @@ export type ConnectionState =
       status: "paired";
       sessionId: string;
       token: string;
+      vaultId: string;
       baseAddress: string;
       stakeAddress: string;
       network: "mainnet" | "preprod";
@@ -438,12 +646,21 @@ export type BridgeState =
 
 type ConnectedMessage = {
   type: "client.connected";
-  payload: ConnectionState;
+  payload: ConnectionState & {
+    sigReqs?: {
+      requestId: string;
+      response?: {
+        status: "accepted" | "rejected";
+        data: string;
+      };
+    }[];
+  };
 };
 
 type WalletUpdatedMessage = {
   type: "client.wallet_updated";
   payload: {
+    vaultId: string;
     baseAddress: string;
     stakeAddress: string;
     network: "mainnet" | "preprod";
@@ -468,7 +685,7 @@ type IncomingMessage = WalletUpdatedMessage | SigReqResponseMessage;
 
 export type SigReqAckMessage = {
   type: "client.sig_req_ack";
-  payload: { requestId: string };
+  payload: { vaultId: string; requestId: string };
 };
 
 export type SigReqCreatedMessage = {
