@@ -8,7 +8,7 @@ const devConfig: Config = {
   ...DEFAULT_CONFIG,
   bridge: {
     ...DEFAULT_CONFIG.bridge,
-    baseUrl: "http://localhost:8000",
+    // baseUrl: "http://localhost:8000",
   },
   retry: {
     backoff: false,
@@ -85,6 +85,7 @@ document
 document.querySelector("#hang")?.addEventListener("click", hang);
 document.querySelector("#debug")?.addEventListener("click", debug);
 document.querySelector("#disconnect")?.addEventListener("click", disconnect);
+document.querySelector("#unlink")?.addEventListener("click", unlink);
 
 // Functions
 function hang() {
