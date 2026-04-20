@@ -79,18 +79,18 @@ export class Bridge {
           isConnected: this.isConnected(),
           connection: this.connection
             ? {
-              id: this.connection.id,
-              ws: WS_STATES[this.connection.ws.readyState],
-              state: this.connection.state,
-              controller: {
-                aborted: this.connection.controller.signal.aborted,
-              },
-              reconnection: {
-                status: this.connection.reconnection ? "active" : "inactive",
-                aborted:
-                  this.connection.reconnection?.controller.signal.aborted,
-              },
-            }
+                id: this.connection.id,
+                ws: WS_STATES[this.connection.ws.readyState],
+                state: this.connection.state,
+                controller: {
+                  aborted: this.connection.controller.signal.aborted,
+                },
+                reconnection: {
+                  status: this.connection.reconnection ? "active" : "inactive",
+                  aborted:
+                    this.connection.reconnection?.controller.signal.aborted,
+                },
+              }
             : undefined,
           sigReqPromises: Array.from(this._sigReqPromises.keys()),
         },
@@ -653,20 +653,20 @@ export async function checkToken(
 
 export type ConnectionState =
   | {
-    status: "pairing";
-    sessionId: string;
-    token: string;
-    pin: string;
-  }
+      status: "pairing";
+      sessionId: string;
+      token: string;
+      pin: string;
+    }
   | {
-    status: "paired";
-    sessionId: string;
-    token: string;
-    vaultId: string;
-    baseAddress: string;
-    stakeAddress: string;
-    network: "mainnet" | "preprod";
-  };
+      status: "paired";
+      sessionId: string;
+      token: string;
+      vaultId: string;
+      baseAddress: string;
+      stakeAddress: string;
+      network: "mainnet" | "preprod";
+    };
 
 export type BridgeState =
   | ConnectionState
