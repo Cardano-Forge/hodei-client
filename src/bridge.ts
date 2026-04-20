@@ -13,12 +13,17 @@ export type BridgeOpts = {
   onStateChange(state: BridgeState): void;
 };
 
+type ReconnectionState = {
+  controller: AbortController;
+  deferred: DeferredPromise<ConnectionState | undefined, string>;
+};
+
 export type BridgeConnection = {
   id: number;
   ws: WebSocket;
   state: BridgeState;
   controller: AbortController;
-  reconnection: AbortController | undefined;
+  reconnection: ReconnectionState | undefined;
   events: EventTarget;
 };
 
@@ -74,17 +79,18 @@ export class Bridge {
           isConnected: this.isConnected(),
           connection: this.connection
             ? {
-                id: this.connection.id,
-                ws: WS_STATES[this.connection.ws.readyState],
-                state: this.connection.state,
-                controller: {
-                  aborted: this.connection.controller.signal.aborted,
-                },
-                reconnection: {
-                  status: this.connection.reconnection ? "active" : "inactive",
-                  aborted: this.connection.reconnection?.signal.aborted,
-                },
-              }
+              id: this.connection.id,
+              ws: WS_STATES[this.connection.ws.readyState],
+              state: this.connection.state,
+              controller: {
+                aborted: this.connection.controller.signal.aborted,
+              },
+              reconnection: {
+                status: this.connection.reconnection ? "active" : "inactive",
+                aborted:
+                  this.connection.reconnection?.controller.signal.aborted,
+              },
+            }
             : undefined,
           sigReqPromises: Array.from(this._sigReqPromises.keys()),
         },
@@ -126,7 +132,7 @@ export class Bridge {
 
   disconnect(): void {
     this.debugLog("disconnecting");
-    this._connection?.reconnection?.abort("disconnecting");
+    this._connection?.reconnection?.controller.abort("disconnecting");
     this._connection?.ws.close(CLOSE_CODES.NormalClosure, "disconnected");
     this._connection = undefined;
   }
@@ -311,16 +317,19 @@ export class Bridge {
       ws.addEventListener(
         "error",
         async (event) => {
+          this.debugLog("received error, will try to reconnect");
           if (await this.reconnect()) {
             this.debugLog("scheduled reconnect after error");
             return;
+          } else {
+            this.debugLog("wasn't able to reconnect");
           }
 
-          this.debugLog(`received error: ${getFailureReason(event)}`);
+          this.debugLog(`received error: ${JSON.stringify(event)}`);
 
           connection.state = {
             status: "error",
-            error: getFailureReason(event),
+            error: JSON.stringify(event),
           };
 
           this._onStateChange(connection.state);
@@ -342,10 +351,15 @@ export class Bridge {
             event.code !== CLOSE_CODES.NormalClosure &&
             event.code !== CLOSE_CODES.SessionDeleted
           ) {
+            this.debugLog(
+              `socket closed with code ${event.code} and reason ${event.reason} but will try to reconnect`,
+            );
             const state = await this.reconnect();
             if (state) {
               this.debugLog("reconnected after close");
               return;
+            } else {
+              this.debugLog("didn't reconnect");
             }
           }
 
@@ -433,14 +447,23 @@ export class Bridge {
       return undefined;
     }
 
-    this.connection.reconnection?.abort("reconnection was re-triggered");
+    if (this.connection.reconnection) {
+      this.debugLog("returning existing reconnection promise");
+      return this.connection.reconnection.deferred.promise;
+    }
 
-    const reconnection = new AbortController();
+    const reconnection: ReconnectionState = {
+      controller: new AbortController(),
+      deferred: deferredPromise(),
+    };
 
-    reconnection.signal.addEventListener(
+    reconnection.controller.signal.addEventListener(
       "abort",
       () => {
-        this.debugLog("reconnection aborted:", reconnection.signal.reason);
+        this.debugLog(
+          "reconnection aborted:",
+          reconnection.controller.signal.reason,
+        );
         if (this.connection.reconnection === reconnection) {
           this.debugLog("clearing reconnection");
           this.connection.reconnection = undefined;
@@ -454,9 +477,12 @@ export class Bridge {
     this.connection.controller.signal.addEventListener(
       "abort",
       // When the parent connection is aborted, cancel the reconnection attempt
-      () => reconnection.abort("parent connection aborted"),
+      () =>
+        reconnection.controller.abort(
+          `parent connection aborted (${this.connection.controller.signal.reason})`,
+        ),
       // When the reconnection is aborted, stop listening on the parent connection controller
-      { signal: reconnection.signal },
+      { signal: reconnection.controller.signal },
     );
 
     this.connection.reconnection = reconnection;
@@ -525,14 +551,14 @@ export class Bridge {
         }
       };
 
-      const c = { signal: reconnection.signal, once: true };
-      reconnection.signal.addEventListener("abort", handleAbort, c);
+      const c = { signal: reconnection.controller.signal, once: true };
+      reconnection.controller.signal.addEventListener("abort", handleAbort, c);
       document.addEventListener("visibilitychange", handleVisibilityChange, c);
       window.addEventListener("focus", reconnectWithDebounce, c);
 
       state = await deferred.promise.catch(() => undefined);
 
-      reconnection.signal.removeEventListener("abort", handleAbort);
+      reconnection.controller.signal.removeEventListener("abort", handleAbort);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", reconnectWithDebounce);
 
@@ -540,26 +566,29 @@ export class Bridge {
         this.debugLog("reconnection attempt failed");
       }
     } while (
-      !reconnection.signal.aborted &&
+      !reconnection.controller.signal.aborted &&
       !state &&
       cfg &&
       retries++ < (cfg.maxRetries ?? Number.POSITIVE_INFINITY)
     );
 
     // When reconnection is aborted, we want to act as if reconnection failed even if it didn't
-    if (reconnection.signal.aborted) {
-      this.debugLog("reconnection was aborted, cancelling reconnection");
-      return undefined;
-    }
-
-    // Trigger reconnection cleanup
-    reconnection.abort("done");
-
-    if (state) {
-      this.debugLog("reconnection successful");
+    if (reconnection.controller.signal.aborted) {
+      this.debugLog(
+        `reconnection was aborted (${reconnection.controller.signal.reason}), cancelling reconnection`,
+      );
     } else {
-      this.debugLog("reconnection failed");
+      // Trigger reconnection cleanup
+      reconnection.controller.abort("done");
+      if (state) {
+        this.debugLog("reconnection successful");
+      } else {
+        this.debugLog("reconnection failed");
+      }
     }
+
+    this.debugLog("resolving reconnection promise");
+    reconnection.deferred.resolve(state);
 
     return state;
   }
@@ -624,20 +653,20 @@ export async function checkToken(
 
 export type ConnectionState =
   | {
-      status: "pairing";
-      sessionId: string;
-      token: string;
-      pin: string;
-    }
+    status: "pairing";
+    sessionId: string;
+    token: string;
+    pin: string;
+  }
   | {
-      status: "paired";
-      sessionId: string;
-      token: string;
-      vaultId: string;
-      baseAddress: string;
-      stakeAddress: string;
-      network: "mainnet" | "preprod";
-    };
+    status: "paired";
+    sessionId: string;
+    token: string;
+    vaultId: string;
+    baseAddress: string;
+    stakeAddress: string;
+    network: "mainnet" | "preprod";
+  };
 
 export type BridgeState =
   | ConnectionState
