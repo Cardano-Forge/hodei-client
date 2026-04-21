@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Hodei",
+  "version": "1.0",
+  "description": "Your wallet, simplified",
+  "content_scripts": [
+    {
+      "js": ["extension.js"],
+      "matches": ["https://*/*", "http://*/*", "<all_urls>"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": ["http://*/*", "https://*/*", "file://*/*"]
+    }
+  ]
+}
