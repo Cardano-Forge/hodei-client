@@ -10,6 +10,7 @@
         "@biomejs/biome": "2.4.4",
         "@microsoft/api-extractor": "^7.57.4",
         "@vitejs/plugin-basic-ssl": "^2.3.0",
+        "chrome-types": "^0.1.425",
         "happy-dom": "^20.7.0",
         "typescript": "~5.9.3",
         "unplugin-dts": "^1.0.0-beta.6",
@@ -234,6 +235,8 @@
     "cbor-js": ["cbor-js@0.1.0", "", {}, "sha512-7sQ/TvDZPl7csT1Sif9G0+MA0I0JOVah8+wWlJVQdVEgIbCzlN/ab3x+uvMNsc34TUvO6osQTAmB2ls80JX6tw=="],
 
     "chai": ["chai@6.2.2", "", {}, "sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg=="],
+
+    "chrome-types": ["chrome-types@0.1.425", "", {}, "sha512-uc1Mc4EGLUeZ1O6ZeQwezCLBrwbBxsPeCu9V7E+8+YHudg6RecgWtzG7L2m+ZW+3ahayhFDq0BwjM2aFujxdyw=="],
 
     "compare-versions": ["compare-versions@6.1.1", "", {}, "sha512-4hm4VPpIecmlg59CHXnRDnqGplJFrbLG4aFEl5vl6cK1u76ws3LLvX7ikFnTDl5vo39sjWD6AaDPYodJp/NNHg=="],
 

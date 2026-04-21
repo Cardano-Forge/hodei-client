@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Hodei",
+  "version": "1.0",
+  "description": "Your wallet, simplified",
+  "content_scripts": [
+    {
+      "js": ["extension.js"],
+      "matches": ["https://*/*", "http://*/*", "<all_urls>"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": ["http://*/*", "https://*/*", "file://*/*"],
+      "use_dynamic_url": true
+    }
+  ],
+  "action": {
+    "default_title": "Hodei",
+    "default_icon": {
+      "16": "images/hodei_16.png",
+      "48": "images/hodei_48.png",
+      "128": "images/hodei_128.png"
+    }
+  },
+  "icons": {
+    "16": "images/hodei_16.png",
+    "48": "images/hodei_48.png",
+    "128": "images/hodei_128.png"
+  },
+  "homepage_url": "https://hodei.io"
+}

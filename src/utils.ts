@@ -60,7 +60,7 @@ export function hasProperty<P extends string>(
 }
 
 export function debounce(fn: () => void, delay: number) {
-  let timer: number | undefined;
+  let timer: NodeJS.Timeout | undefined;
   return () => {
     if (timer) {
       clearTimeout(timer);
