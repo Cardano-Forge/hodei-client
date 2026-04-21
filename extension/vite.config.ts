@@ -1,4 +1,4 @@
-import { copyFile } from "node:fs/promises";
+import { copyFile, mkdir } from "node:fs/promises";
 import { defineConfig, type PluginOption } from "vite";
 
 const entryPoints = {
@@ -46,7 +46,22 @@ function copyStaticAssets(): PluginOption {
       }
       console.log("Copying static assets...");
       hasGenerated = true;
-      await copyFile("extension/manifest.json", "extension/dist/manifest.json");
+      await mkdir("extension/dist/images");
+      await Promise.all([
+        copyFile("extension/manifest.json", "extension/dist/manifest.json"),
+        copyFile(
+          "extension/images/hodei_128.png",
+          "extension/dist/images/hodei_128.png",
+        ),
+        copyFile(
+          "extension/images/hodei_48.png",
+          "extension/dist/images/hodei_48.png",
+        ),
+        copyFile(
+          "extension/images/hodei_16.png",
+          "extension/dist/images/hodei_16.png",
+        ),
+      ]);
       console.log("\nCopying static assets... done.");
     },
   };
