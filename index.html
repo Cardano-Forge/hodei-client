@@ -52,13 +52,14 @@
         <button type="button" id="debug">de[B]ug</button>
         <button type="button" id="disconnect">[D]isconnect</button>
         <button type="button" id="unlink">[U]nlink</button>
+        <button type="button" id="toggleMode">[M]ode</button>
       </ul>
     </article>
   </section>
   <section id="state">
     <article>
       <header>State</header>
-      <pre id="walletState">{<br> "status": "disconnected"<br>}</pre>
+      <pre id="walletState">{<br>  "mode": "vanilla",<br>  "status": "disconnected"<br>}</pre>
     </article>
   </section>
   <script type="module" src="/src/dev.ts"></script>
