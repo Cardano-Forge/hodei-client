@@ -18,7 +18,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:extension": "ENTRY=extension vite build -c extension/vite.config.ts && ENTRY=injected vite build -c extension/vite.config.ts",
-    "build:preview": "vite build -c vite.preview.ts",
+    "build:preview": "vite build -c vite.preview.ts --mode development",
     "preview": "bun run build:preview && vite preview -c vite.preview.ts",
     "check": "tsc --noEmit",
     "lint": "biome check --write .",

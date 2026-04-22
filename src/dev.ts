@@ -47,12 +47,15 @@ const playgrounds: Record<PlaygroundApi["mode"], () => PlaygroundApi> = {
         initialize({
           ...baseConfig,
           onError: ({ error }) => {
+            if (playground.mode !== "vanilla") return;
             updateWalletState({ status: "error", error: error ?? "unknown" });
           },
           onClose: ({ code, reason }) => {
+            if (playground.mode !== "vanilla") return;
             updateWalletState({ status: "closed", code, reason });
           },
           onWalletUpdate: (wallet) => {
+            if (playground.mode !== "vanilla") return;
             updateWalletState({ status: "connected", ...wallet });
           },
         });
@@ -101,7 +104,7 @@ const playgrounds: Record<PlaygroundApi["mode"], () => PlaygroundApi> = {
   },
 } satisfies Record<string, () => PlaygroundApi>;
 
-let playground = playgrounds.vanilla();
+let playground = playgrounds.weld();
 playground.init();
 
 function updateWalletState(state: object) {

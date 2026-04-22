@@ -1,7 +1,6 @@
 import { getBalance, getUtxos, submitTx } from "./anvil";
 import type { DataSignature, EnabledWalletApi, InitialWalletApi } from "./api";
 import {
-  assertIncomingMessage,
   Bridge,
   type BridgeOpts,
   type BridgeState,
@@ -17,7 +16,11 @@ import {
   type TxSignErrorCode,
 } from "./error";
 import { getToken } from "./storage";
-import { deferredPromise, getFailureReason } from "./utils";
+import {
+  type DeferredPromise,
+  deferredPromise,
+  getFailureReason,
+} from "./utils";
 
 export type { Config, EnabledWalletApi, InitialWalletApi, DataSignature };
 
@@ -68,6 +71,7 @@ export function createInitialWalletApi(
     }
 
     if (bridgeState.status === "paired") {
+      state.resolved?.pairingPromise?.resolve();
       state.config.onWalletUpdate?.({
         baseAddress: bridgeState.baseAddress,
         stakeAddress: bridgeState.stakeAddress,
@@ -112,10 +116,10 @@ export function createInitialWalletApi(
         state.resolved = resolved;
 
         if (state.config.waitForPairing) {
-          await resolved.pairingPromise;
+          await resolved.pairingPromise.promise;
         } else {
           // Handle promise rejection
-          resolved.pairingPromise.catch(() => {});
+          resolved.pairingPromise.promise.catch(() => {});
         }
 
         return resolved.api;
@@ -189,7 +193,7 @@ type EnableOutput = {
   api: EnabledWalletApi;
   bridge: Bridge;
   client: MountClientOutput;
-  pairingPromise: Promise<void>;
+  pairingPromise: DeferredPromise<void, string>;
 };
 
 async function enable(input: Bridge | BridgeOpts): Promise<EnableOutput> {
@@ -350,29 +354,7 @@ async function enable(input: Bridge | BridgeOpts): Promise<EnableOutput> {
         controller.abort();
         pairingPromise.reject(new Error("Aborted"));
       },
-      {
-        signal: controller.signal,
-      },
-    );
-
-    bridge.connection.events.addEventListener(
-      "message",
-      (event) => {
-        if (!(event instanceof CustomEvent)) {
-          return;
-        }
-        try {
-          const message = event.detail;
-          assertIncomingMessage(message);
-          if (message.type === "client.wallet_updated") {
-            pairingPromise.resolve();
-            controller.abort();
-          }
-        } catch {}
-      },
-      {
-        signal: controller.signal,
-      },
+      { once: true, signal: controller.signal },
     );
   } else {
     pairingPromise.resolve();
@@ -382,7 +364,7 @@ async function enable(input: Bridge | BridgeOpts): Promise<EnableOutput> {
     api,
     bridge,
     client,
-    pairingPromise: pairingPromise.promise,
+    pairingPromise,
   };
 }
 
