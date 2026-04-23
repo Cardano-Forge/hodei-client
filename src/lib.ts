@@ -99,11 +99,9 @@ export function createInitialWalletApi(
         return state.resolved.api;
       }
 
-      if (!state.promise && state.resolved) {
+      if (state.resolved) {
         state.promise = enable(state.resolved.bridge);
-      }
-
-      if (!state.promise) {
+      } else {
         state.promise = enable({
           config: state.config,
           onStateChange: handleStateChange,
