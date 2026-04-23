@@ -20,7 +20,7 @@
     "build": "vite build",
     "build:preview": "vite build -c vite.preview.ts --mode development",
     "build:extension": "ENTRY=extension vite build -c extension/vite.config.ts && ENTRY=injected vite build -c extension/vite.config.ts",
-    "package:extension": "bun run build:extension && cd extension/dist && zip --recurse-paths ../../extension.zip * && cd ../..",
+    "package:extension": "bun run build:extension && cd extension/dist && zip --recurse-paths ../../extension.zip *",
     "check": "tsc --noEmit",
     "lint": "biome check --write .",
     "test:watch": "vitest",
