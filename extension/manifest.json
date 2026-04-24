@@ -3,16 +3,21 @@
   "name": "Hodei",
   "version": "1.0",
   "description": "Your wallet, simplified",
+  "host_permissions": [
+    "https://prod.api.ada-anvil.app/v2/services/*",
+    "https://preprod.api.ada-anvil.app/v2/services/*",
+    "https://bridge.hodei.io/api/dev/*"
+  ],
   "content_scripts": [
     {
       "js": ["extension.js"],
-      "matches": ["https://*/*", "http://*/*", "<all_urls>"]
+      "matches": ["https://*/*", "http://*/*"]
     }
   ],
   "web_accessible_resources": [
     {
       "resources": ["injected.js"],
-      "matches": ["http://*/*", "https://*/*", "file://*/*"],
+      "matches": ["https://*/*", "http://*/*"],
       "use_dynamic_url": true
     }
   ],
